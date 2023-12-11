@@ -1,0 +1,24 @@
+#ifndef __APP_<--Template-->_<--W0H-->_H__
+#define __APP_<--Template-->_<--W0H-->_H__
+
+
+#include "App<--Template-->.h"
+
+NS_DT_BEGIN
+
+
+class App<--Template-->Layer<--W0H--> : public App<--Template-->Layer
+{
+public:
+
+    bool initLayer() override;
+
+    APP_LAYER_CREATE_WITH_APP(App<--Template-->Layer<--W0H-->,App<--Template-->);
+
+};
+
+
+NS_DT_END
+
+
+#endif //__APP_<--Template-->_<--W0H-->_H__

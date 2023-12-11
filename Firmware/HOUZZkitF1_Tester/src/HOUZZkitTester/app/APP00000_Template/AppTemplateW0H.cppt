@@ -1,0 +1,11 @@
+#include "App<--Template--><--W0H-->.h"
+
+NS_DT_BEGIN
+
+bool App<--Template-->Layer<--W0H-->::initLayer()
+{
+    return true;
+}
+
+
+NS_DT_END

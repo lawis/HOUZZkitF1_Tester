@@ -1,0 +1,95 @@
+#ifndef __APP_<--Template-->_H__
+#define __APP_<--Template-->_H__
+
+#include "HOUZZkitTester/app/AppBase.h"
+#include "HOUZZkitTester/data/SDTData.h"
+
+NS_DT_BEGIN
+
+#define App<--Template-->_APP_ID      <--APPID-->
+
+class App<--Template-->Theme : public AppTheme
+{
+public:
+    
+
+};
+
+class AppData<--Template--> : public AppDataTemplate<AppData<--Template-->,App<--Template-->_APP_ID>
+{
+private:
+    
+    uint8_t _theme;
+
+public:
+
+    App<--Template-->Theme appTheme;
+
+    //增加自定义成员变量
+
+protected:
+
+    bool subEncode(SDTData::DataSourceType type) override;
+
+    bool subDecode(SDTData::DataSourceType type) override;
+
+    void setDefault() override;
+
+public:
+
+    AppData<--Template-->();
+
+    void setTheme(uint8_t t);
+
+};
+
+
+class AppSchedule<--Template--> : public AppScheduleTemplate<AppSchedule<--Template-->,AppData<--Template-->,App<--Template-->_APP_ID>
+{
+
+public:
+
+   	bool parseRequest(const String& res);
+
+	void scheduleAction(float dt) override;
+
+};
+
+
+class App<--Template--> : public AppTemplate<App<--Template-->,AppData<--Template-->,AppSchedule<--Template-->,App<--Template-->_APP_ID>
+{
+
+protected:
+
+    bool init() override;
+
+public:
+
+
+
+};
+
+
+class App<--Template-->Layer : public AppLayerTemplate<App<--Template-->Layer,App<--Template-->,AppData<--Template-->>
+{
+    
+private:
+
+
+protected:
+
+
+public:
+
+
+public:
+
+    bool initLayer() override;
+    
+};
+
+
+NS_DT_END
+
+#endif //__APP_<--Template-->_H__
+

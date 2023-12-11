@@ -1,0 +1,112 @@
+#include "App<--Template-->.h"
+<--Include Subclass-->
+
+NS_DT_BEGIN
+
+AppData<--Template-->::AppData<--Template-->()
+:_theme(0)
+{
+    scheduleType = AppDataBase::ScheduleType::NONE;
+    scheduleInterval = 0;
+
+    appAlias = "";
+    this->setTheme(_theme);
+}
+
+bool AppData<--Template-->::subEncode(SDTData::DataSourceType type)
+{
+    pushUint8(_theme);
+    return true;
+}
+
+bool AppData<--Template-->::subDecode(SDTData::DataSourceType type)
+{
+    this->setTheme(popUint8());
+    return true;
+}
+
+void AppData<--Template-->::setDefault()
+{
+
+}
+
+void AppData<--Template-->::setTheme(uint8_t t)
+{
+    switch (t) {
+        case 0:
+            appTheme.copyTheme(*(AppManager::getInstance()->globalAppTheme));
+            break;
+        case 1:
+            appTheme.textColor = DTRGB(255, 0, 0);
+            appTheme.bgColor = DTRGB(0, 255, 0);
+            appTheme.fgColor = DTRGB(255, 0, 0);
+            break;
+            
+        default:
+            break;
+    }
+}
+
+
+bool AppSchedule<--Template-->::parseRequest(const String& res)
+{
+    return true;
+}
+
+void AppSchedule<--Template-->::scheduleAction(float dt)
+{
+    
+}
+
+
+bool App<--Template-->::init()
+{
+    AppDataBase::AppSizeType type = this->getData()->appSizeType;
+    if (type == AppDataBase::AppSizeType::AUTO)
+    {
+        type = this->getAppSizeTypeByScreen();
+    }
+    switch (type)
+    {
+    case AppDataBase::AppSizeType::S3208:
+    {
+        rootLayer = App<--Template-->Layer3208::createWithApp(this,Size(32,8));
+    }
+        break;
+    case AppDataBase::AppSizeType::S16016:
+    {
+        rootLayer = App<--Template-->Layer16016::createWithApp(this,Size(16,16));
+    }
+        break;
+    case AppDataBase::AppSizeType::S808:
+    {
+        rootLayer = App<--Template-->Layer808::createWithApp(this,Size(8,8));
+    }
+        break;
+    case AppDataBase::AppSizeType::S12012:
+    {
+        rootLayer = App<--Template-->Layer12012::createWithApp(this,Size(12,12));
+    }
+        break;
+    case AppDataBase::AppSizeType::S32016:
+    {
+        rootLayer = App<--Template-->Layer32016::createWithApp(this,Size(32,16));
+    }
+        break;
+    default:
+    {
+        rootLayer = App<--Template-->Layer::createWithApp(this,Size::ZERO);
+    }
+        break;
+    }
+    this->addChild(rootLayer);
+    return true;
+}
+
+
+bool App<--Template-->Layer::initLayer()
+{
+    return true;
+}
+
+NS_DT_END

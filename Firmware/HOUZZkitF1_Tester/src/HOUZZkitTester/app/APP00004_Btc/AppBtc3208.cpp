@@ -1,0 +1,34 @@
+#include "AppBtc3208.h"
+
+NS_DT_BEGIN
+
+const uint8_t icon_btc[] PROGMEM =
+{
+    0x00,0x2a,
+    0x44,0x47,0x46,0x11,0x08,0x08,0x42,0x00,
+    0x00,0x00,0xff,0xa5,0x00,0xfe,0xff,0xff,
+    0x2c,0x00,0x3c,0x00,0x00,0x08,0x08,0x80,
+    0x00,0x16,0x54,0x5a,0x95,0x59,0x65,0x5a,
+    0xa5,0x59,0x95,0x59,0x65,0x5a,0xa5,0x16,
+    0x54,0x96
+};
+
+bool AppBtcLayer3208::initLayer()
+{
+    _layerStyle = LayerStyleIconNum3208::create();
+    _layerStyle->initWithData(icon_btc+2,GetUint16(icon_btc),this->getData(),this,48);
+    this->addChild(_layerStyle);
+    return true;
+}
+
+void AppBtcLayer3208::printAction(SpriteCanvas* canvas)
+{
+    if(this->getData()->isShowCoinName)
+    {
+        canvas->printf("%s %.2f",this->getData()->symbolName.c_str(),this->getData()->price);
+    }else{
+        canvas->printf("%.2f",this->getData()->price);
+    }
+}
+
+NS_DT_END
