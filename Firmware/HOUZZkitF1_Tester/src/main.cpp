@@ -4,379 +4,481 @@
 
 #ifndef UNIT_TEST
 
-#include "Dot2D/dot2d.h"
-#include "HOUZZkitTester/device/SDTScreen.h"
-#include "HOUZZkitTester/SDTSystem.h"
-#include "HOUZZkitTester/SDTConfig.h"
-#include <ESP_DoubleResetDetector.h> 
+#include "HOUZZkitF1Tester/device/HFTScreen.h"
+#include "HOUZZkitF1Tester/device/HFTEncoder.h"
+#include "HOUZZkitF1Tester/connection/HFTConnectionManager.h"
 
-//Build version number, increase by 1 automatically each time you compile
-#define FIRMWARE_BUILD_VERSION 29
+ScreenManager *m_screenManager = nullptr;
+HFTEncoder *m_hftEncoder = nullptr;
+ConnectionManager *m_connectionManager = nullptr;
 
-//Build date and time, set to the time when editing starts each time you compile
-#define FIRMWARE_BUILD_DATETIME "3872b"
+void workFlow(void *pvParameters);
 
-String FirmwareBuildVersion()
+void encoderButtonClick()
 {
-    return FIRMWARE_BUILD_DATETIME + String(FIRMWARE_BUILD_VERSION,HEX);
+  Serial.println("encoderButtonClick");
+  
+
+  Serial.println(m_connectionManager->ethernetConn->connected()?"connected" : "not connected");
+  
+
+  // Serial.println(res);
 }
 
-dot2d::Director* director = nullptr;
-
-SDTSystem* m_sdtSystem = nullptr;
-
-LedScreenManager* m_screenManager = nullptr;
-
-DoubleResetDetector* m_doubleResetDetector = nullptr;
-
-class MainDelegate : public dot2d::DirectorDelegate
+void encoderRotation(RotationType type)
 {
+  switch (type)
+  {
+  case RT_LEFT:
+    Serial.println("LEFT");
+    m_screenManager->lcdDisplay->left_slide();
+    break;
+  case RT_RIGHT:
+    Serial.println("RIGHT");
+    m_screenManager->lcdDisplay->right_slide();
+    break;
+  default:
+    break;
+  }
+}
 
-    void _render()
-    {
-        
-        AppManager::getInstance()->drawTempStatus();
-        m_screenManager->show();
-        // Serial.printf("-----Free Heap Mem : %d [%.2f%%]-----\n",
-        //         ESP.getFreeHeap(),
-        //         ESP.getFreeHeap()/(double)ESP.getHeapSize()*100);
-        // Serial.printf("-----Free PSRAM Mem: %d [%.2f%%]-----\n",
-        //         ESP.getFreePsram(),
-        //         ESP.getFreePsram()/(double)ESP.getPsramSize()*100);
-    }
-
-    size_t write(uint8_t c){return Serial.write(c);}
-
-};
-
-void network(void *pvParameters);
-
-void setup() 
+void setup()
 {
   //----------------Start Serial Communication----------------
   Serial.begin(115200);
 
   //----------------Print Hardware Information----------------
   Serial.printf("\n----------------BOOTING INFO----------------\n");
-  Serial.printf("------ESP SDK Version : %s\n",ESP.getSdkVersion());
-  Serial.printf("------Dot2d Version : %s\n",dot2d::dot2dVersion());
-  Serial.printf("------Firmware Version : %s\n",(FirmwareVersion()+"."+FirmwareBuildVersion()).c_str());
-#if PRINT_DEBUG_INFO
+  // Serial.printf("------ESP SDK Version : %s\n",ESP.getSdkVersion());
+  // Serial.printf("------Dot2d Version : %s\n",dot2d::dot2dVersion());
+  // Serial.printf("------Firmware Version : %s\n",(FirmwareVersion()+"."+FirmwareBuildVersion()).c_str());
+  // #if PRINT_DEBUG_INFO
   Serial.println("-----------------ESP INFO----------------");
-  Serial.printf("------ESP Chip Version : %d\n",ESP.getChipRevision());
-  Serial.printf("------ESP CPU Freq : %d MHz\n",ESP.getCpuFreqMHz());
-  Serial.printf("------ESP Flash Chip Mode : %d\n",ESP.getFlashChipMode());
-  Serial.printf("------ESP Flash Chip Size : %dM\n",ESP.getFlashChipSize()/1024/1024);
-  Serial.printf("------ESP Flash Chip Speed : %dM\n",ESP.getFlashChipSpeed()/1000/1000);
+  Serial.printf("------ESP Chip Version : %d\n", ESP.getChipRevision());
+  Serial.printf("------ESP CPU Freq : %d MHz\n", ESP.getCpuFreqMHz());
+  Serial.printf("------ESP Flash Chip Mode : %d\n", ESP.getFlashChipMode());
+  Serial.printf("------ESP Flash Chip Size : %dM\n", ESP.getFlashChipSize() / 1024 / 1024);
+  Serial.printf("------ESP Flash Chip Speed : %dM\n", ESP.getFlashChipSpeed() / 1000 / 1000);
   // Serial.printf("------ESP Firmware Size : %d\n",ESP.getSketchSize());
   // Serial.printf("ESP Firmware MD5 : %s\n",ESP.getSketchMD5().c_str());
   Serial.println("-----------------------------------------");
-#endif
-
-  //----------------Initialize All System Data----------------
-  m_sdtSystem = SDTSystem::getInstance();
-  if(!m_sdtSystem->initSystemData())
-  {
-    Serial.printf("---ERROR!!!---System Data Init Failed.\n");
-    return;
-  }else
-  {
-    Serial.printf("------Device Model : %s\n",m_sdtSystem->deviceModel().c_str());
-    Serial.printf("------Device UDID : %s\n",m_sdtSystem->UDID().c_str());
-  }
+  // #endif
 
   //----------------Initialize Display----------------
-  m_screenManager = LedScreenManager::getInstance();
+  m_screenManager = ScreenManager::getInstance();
   m_screenManager->initScreen();
-  dot2d::Size matrixSize = m_screenManager->getMatrixSize();
 
-  //----------------Initialize Dot2d Engine And Render Canvas----------------
-  director = dot2d::Director::getInstance();                      //Obtain director object
-  director->setDelegate(new MainDelegate());                      //Set up director delegate
-  director->setFramesPerSecond(30);                               //Set up farame rate
-  Serial.printf("------Dot2d Director init succeed.\n");
-  director->initDotCanvas(matrixSize.width,matrixSize.height);
-  m_screenManager->initMatrix(director->getDotCanvas());
-  m_screenManager->setBrightness(m_sdtSystem->brightness());
-  Serial.printf("------Screen And Canvas init succeed.\n");
-
-  //----------------Initialize APP management class----------------
-  if(m_sdtSystem->initAppManager())
-  {
-    Serial.printf("------App Manager init succeed.\n");
-  }else
-  {
-    Serial.printf("---ERROR!!!---App Manager init failed.\n");
-  }
-
-  //----------------Initialize message queues in network management classes----------------
-  m_sdtSystem->initNetwork();
-
-
-#if RDR_ENABLE
-  //----------------Enable reset logic detection----------------
-  m_doubleResetDetector = new DoubleResetDetector(DRD_TIMEOUT, DRD_ADDRESS);
-#endif
-
-  //----------------Enable reset logic detection---------------------
-  if (m_sdtSystem->newDevice())
-  {
-    DEVICE.initBtChip();
-    m_sdtSystem->setNewDevice(false);
-    m_sdtSystem->saveDeviceData();
-  }else if(m_sdtSystem->uninitDevice())
-  {
-    //Play the first time entering device animation
-    
-  }
-  else
-  {
-#if RDR_ENABLE
-    //----------------Check if the system is reset----------------  
-    if (m_doubleResetDetector->detectDoubleReset()) 
-    {
-      Serial.printf("------Detect Double Reset Viable.\n");
-      pinMode(12,INPUT_PULLUP);
-      if (digitalRead(12) == LOW)
-      {
-        m_sdtSystem->resetSystemToFactoryState();
-      }else
-      {
-        m_sdtSystem->resetSystem();
-      }
-      return;
-    }else
-    {
-      Serial.printf("------Detect Double Reset Passed.\n");
-    }
-#endif
-  }
-  //----------------Initialize Device Management Class---------------- 
-  if(m_sdtSystem->initDevice())
-  {
-    Serial.printf("------Device init succeed.\n");
-  }else
-  {
-    Serial.printf("---ERROR!!!---Device init failed.\n");
-  }
+  m_hftEncoder = new HFTEncoder();
+  m_hftEncoder->init(4, 5, 6);
+  m_hftEncoder->attachClick(encoderButtonClick);
+  m_hftEncoder->attachRotation(encoderRotation);
 
   // //Start network request thread  //Starting the network on a network thread
-  xTaskCreatePinnedToCore(network,"network",16384,NULL,1,NULL,0);
-
+  xTaskCreatePinnedToCore(workFlow, "workFlow", 16384, NULL, 1, NULL, 0);
 }
 
-void network(void *pvParameters)
+void workFlow(void *pvParameters)
 {
-  //----------------Initialize WIFI system----------------
-  if(m_sdtSystem->initWifiSystem())
-  {
-    Serial.printf("------WIFI SYSTEM init succeed.\n");
-  }else
-  {
-    Serial.printf("---ERROR!!!---WIFI SYSTEM init failed.\n");
-  }
-
-  SDTSystem::SystemState state = m_sdtSystem->resetState();
-
-  if(state == SDTSystem::SystemState::INIT)
-  {
-    Serial.printf("------System Is Waiting Connecting.\n");
-    //----------------Initialize BLE system----------------
-    if(m_sdtSystem->initBleSystem())
-    {
-      Serial.printf("------BLE SYSTEM init succeed.\n");
-      // DEVICE.btStartBuzzer();
-    }else
-    {
-      Serial.printf("---ERROR!!!---BLE SYSTEM init failed.\n");
-    }
-    xMESSAGE msg(&AppManager::mtfSystemInitAction);
-    NET_QUEUE_SEND(&msg);
-  }else if(state == SDTSystem::SystemState::NORMAL)
-  {
-    if(m_sdtSystem->initWebSocket())
-    {
-      Serial.printf("------Websocket init succeed.\n");
-    }else
-    {
-      Serial.printf("---ERROR!!!---Websocket init failed.\n");
-    }
-    
-    if(m_sdtSystem->initMqttSystem())
-    {
-      Serial.printf("------MQTT SYSTEM init succeed.\n");
-    }else
-    {
-      Serial.printf("---ERROR!!!---MQTT SYSTEM init failed.\n");
-    }
-    Serial.printf("------System Is Working.\n");
-
-    m_sdtSystem->startHeartbeat();
-    xMESSAGE msg(&AppManager::mtfSystemNormalAction);
-    NET_QUEUE_SEND(&msg);// _appManager->initRequestList(); _appManager->playAppList();
-  }
-
+  m_connectionManager = ConnectionManager::getInstance();
   while (1)
   {
-    m_sdtSystem->networkLoop();
+    // Serial.println("workFlowLoop");
+    m_connectionManager->loop();
     vTaskDelay(10);
   }
-
   vTaskDelete(NULL);
 }
 
-void loop() 
-{
-  vTaskDelay(10);
-#if RDR_ENABLE
-    m_doubleResetDetector->loop();
-#endif
-  m_sdtSystem->loop();
-  NET_MUTEX_LOCK();
-  director->mainLoop();
-  NET_MUTEX_UNLOCK();
-}
+// void network(void *pvParameters)
+// {
+//   //----------------Initialize WIFI system----------------
+//   if(m_sdtSystem->initWifiSystem())
+//   {
+//     Serial.printf("------WIFI SYSTEM init succeed.\n");
+//   }else
+//   {
+//     Serial.printf("---ERROR!!!---WIFI SYSTEM init failed.\n");
+//   }
 
+//   SDTSystem::SystemState state = m_sdtSystem->resetState();
+
+//   if(state == SDTSystem::SystemState::INIT)
+//   {
+//     Serial.printf("------System Is Waiting Connecting.\n");
+//     //----------------Initialize BLE system----------------
+//     if(m_sdtSystem->initBleSystem())
+//     {
+//       Serial.printf("------BLE SYSTEM init succeed.\n");
+//       // DEVICE.btStartBuzzer();
+//     }else
+//     {
+//       Serial.printf("---ERROR!!!---BLE SYSTEM init failed.\n");
+//     }
+//     xMESSAGE msg(&AppManager::mtfSystemInitAction);
+//     NET_QUEUE_SEND(&msg);
+//   }else if(state == SDTSystem::SystemState::NORMAL)
+//   {
+//     if(m_sdtSystem->initWebSocket())
+//     {
+//       Serial.printf("------Websocket init succeed.\n");
+//     }else
+//     {
+//       Serial.printf("---ERROR!!!---Websocket init failed.\n");
+//     }
+
+//     if(m_sdtSystem->initMqttSystem())
+//     {
+//       Serial.printf("------MQTT SYSTEM init succeed.\n");
+//     }else
+//     {
+//       Serial.printf("---ERROR!!!---MQTT SYSTEM init failed.\n");
+//     }
+//     Serial.printf("------System Is Working.\n");
+
+//     m_sdtSystem->startHeartbeat();
+//     xMESSAGE msg(&AppManager::mtfSystemNormalAction);
+//     NET_QUEUE_SEND(&msg);// _appManager->initRequestList(); _appManager->playAppList();
+//   }
+
+//   while (1)
+//   {
+//     m_sdtSystem->networkLoop();
+//     vTaskDelay(10);
+//   }
+
+//   vTaskDelete(NULL);
+// }
+
+void loop()
+{
+  // Serial.println("loop");
+  m_hftEncoder->tick();
+  m_screenManager->lcdDisplay->loop();
+  // delay(100);
+}
 
 #else
 
-void unitTest()
+#include <SPI.h>
+#include "LCD_Driver.h"
+#include "GUI_Paint.h"
+#include "image.h"
+
+#include <SPI.h>
+#include <Ethernet2.h>
+
+// Enter a MAC address for your controller below.
+// Newer Ethernet shields have a MAC address printed on a sticker on the shield
+byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
+// if you don't want to use DNS (and reduce your sketch size)
+// use the numeric IP instead of the name for the server:
+// IPAddress server(74,125,232,128);  // numeric IP for Google (no DNS)
+char server[] = "www.taobao.com"; // name address for Google (using DNS)
+
+// Set the static IP address to use if the DHCP fails to assign
+IPAddress ip(192, 168, 13, 177);
+
+// Initialize the Ethernet client library
+// with the IP address and port of the server
+// that you want to connect to (port 80 is default for HTTP):
+EthernetClient client;
+
+void setup()
 {
-  Serial.printf("-----Free Heap Mem : %d [%.2f%%]-----\n",
-                  ESP.getFreeHeap(),
-                  ESP.getFreeHeap()/(double)ESP.getHeapSize()*100);
+  Config_Init();
+  LCD_Init();
 
-}
+  LCD_SetBacklight(100);
 
+  // Serial.begin(115200);
 
-#include "FastLED.h"
-// #include "WiFi.h"
-
-// static const char *ssid     = "DLINK-Y9C6";  // your network SSID (name of wifi network)
-// static const char *password = "yc18610681168"; // your network password
-
-#define LED_PIN             32
-#define LED_WIDTH           32
-#define LED_HEIGHT          8
-#define LED_NUM             256
-
-#define GIF_IMG             "/GIF_IMG"
-
-CRGB data[LED_NUM];
-
-uint16_t* _matrixIndex;
-
-uint16_t XY(uint16_t x, uint16_t y)
-{
-    return _matrixIndex[y * LED_WIDTH + x];
-}
-
-void drawDot(int32_t x,int32_t y,const CRGB& c)
-{
-  if (x>=LED_WIDTH || x<0 || y>=LED_HEIGHT || y<0)
+  while (!Serial)
   {
-    return;
+    ; // wait for serial port to connect. Needed for Leonardo only
   }
-  data[XY(x,y)] = c;
-}
+  Ethernet.init(45);
 
-struct LED_PWM_Def
-{
-  int freq = 500;
-  int resolution = 8;
-  int ledChannel;
-  int ledPin;
-  LED_PWM_Def(int c, int p) :ledChannel(c), ledPin(p){};
-};
-
-LED_PWM_Def LEDB = {1,15};
-
-void LED_PWM_Init(LED_PWM_Def led)
-{
-  ledcSetup(led.ledChannel, led.freq , led.resolution);
-  ledcAttachPin(led.ledPin, led.ledChannel);
-}
-
-#define BUZZER_PIN 15
-#define BUZZER_CHANNEL 1
-void Buzzer(void *pvParameters)
-{
-  for (size_t i = 0; i < 10; i++)
+  // start the Ethernet connection:
+  if (Ethernet.begin(mac) == 0)
   {
-      ledcAttachPin(BUZZER_PIN, BUZZER_CHANNEL);
-      ledcWriteNote(BUZZER_CHANNEL, NOTE_B, 4);
-      delay(200);
-      ledcWriteNote(BUZZER_CHANNEL, NOTE_B, 4);
-      delay(200);
-      ledcDetachPin(BUZZER_PIN);
-      delay(600);
-      // if (i==5)
-      // {
-      //   vTaskDelete(nullptr);
-      // }
-      
+    Serial.println("Failed to configure Ethernet using DHCP");
+    // no point in carrying on, so do nothing forevermore:
+    // try to congifure using IP address instead of DHCP:
+    Ethernet.begin(mac, ip);
   }
-  vTaskDelete(NULL);
-}
-
-
-void setup(){
-
+  // give the Ethernet shield a second to initialize:
   delay(1000);
+  Serial.println("connecting...");
 
-  Serial.begin(115200);
-
-  // FastLED.setBrightness(50);
-
-  // FastLED.addLeds<WS2812Controller800Khz,LED_PIN, GRB>((CRGB* )data,LED_NUM);
-  //   // Serial.print("Attempting to connect to SSID: ");
-  //   // WiFi.begin(ssid, password);
-  // _matrixIndex = (uint16_t* )malloc(sizeof(uint16_t) * LED_NUM);
-  // for (uint8_t y = 0; y < LED_HEIGHT; y++)
-  // {
-  //     for (uint8_t x = 0; x < LED_WIDTH; x++)
-  //     {
-  //         uint16_t order = y*LED_WIDTH;
-  //         if (y%2==0)
-  //         {
-  //             order+=x;
-  //         }else
-  //         {
-  //             order+=(31-x);
-  //         }
-  //         _matrixIndex[y * LED_WIDTH + x] = order;
-  //     }
-  // }
-  
-  // LED_PWM_Init(LEDB);
-
-  // ledcWrite(LEDB.ledChannel,250);
-
-  xTaskCreatePinnedToCore(Buzzer,"Buzzer",8192,NULL,1,NULL,0);
-
-  
+  // if you get a connection, report back via serial:
+  if (client.connect(server, 80))
+  {
+    Serial.println("connected");
+    // Make a HTTP request:
+    client.println("GET /search?q=arduino HTTP/1.1");
+    client.println("Host: www.baidu.com");
+    client.println("Connection: close");
+    client.println();
+  }
+  else
+  {
+    // kf you didn't get a connection to the server:
+    Serial.println("connection failed");
+  }
 }
 
+void loop()
+{
+  // #if 1
+  //     Paint_NewImage(LCD_WIDTH, LCD_HEIGHT, 90, WHITE);
+  //     Paint_Clear(WHITE);
 
+  //     // Paint_DrawString_EN(30, 10, "123", &Font24, YELLOW, RED);
+  //     // Paint_DrawString_EN(30, 34, "ABC", &Font24, BLUE, CYAN);
 
-void loop() {
-  // ledcAttachPin(BUZZER_PIN, BUZZER_CHANNEL);
-  // ledcWriteNote(BUZZER_CHANNEL, NOTE_C, 4);
-  // delay(500);
-  // ledcWriteNote(BUZZER_CHANNEL, NOTE_D, 4);
-  // delay(500);
-  // ledcWriteNote(BUZZER_CHANNEL, NOTE_E, 4);
-  // delay(500);
-  // ledcWriteNote(BUZZER_CHANNEL, NOTE_F, 4);
-  // delay(500);
-  // ledcWriteNote(BUZZER_CHANNEL, NOTE_G, 4);
-  // delay(500);
-  // ledcWriteNote(BUZZER_CHANNEL, NOTE_A, 4);
-  // delay(500);
-  // ledcWriteNote(BUZZER_CHANNEL, NOTE_B, 4);
-  // delay(500);
-  // ledcDetachPin(BUZZER_PIN);
-  delay(2000);
+  //     // Paint_DrawString_CN(235,10, "微", &Font24CN, WHITE, RED);
+  //     // Paint_DrawString_CN(235,40, "雪", &Font24CN, WHITE, RED);
+  //     // Paint_DrawString_CN(235,70, "电", &Font24CN, WHITE, RED);
+  //     // Paint_DrawString_CN(235,100, "子", &Font24CN, WHITE, RED);
+
+  //     Paint_DrawRectangle(125, 10, 225, 58, RED,DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  //     Paint_DrawLine(125, 10, 225, 58, MAGENTA, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+  //     Paint_DrawLine(225, 10, 125, 58, MAGENTA, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+  //     Paint_DrawCircle(150, 100, 25, BLUE, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  //     Paint_DrawCircle(180, 100, 25, BLACK, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  //     Paint_DrawCircle(210, 100, 25, RED, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  //     Paint_DrawCircle(165, 125, 25, YELLOW, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  //     Paint_DrawCircle(195, 125, 25, GREEN, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+
+  //     Paint_DrawImage(gImage_70X70, 20, 80, 70, 70);
+  //     delay(3000);
+  // #endif
+
+#if 1
+  Paint_NewImage(LCD_WIDTH, LCD_HEIGHT, 0, WHITE);
+  Paint_Clear(WHITE);
+
+  Paint_DrawString_EN(30, 10, "123", &Font24, YELLOW, RED);
+  Paint_DrawString_EN(30, 34, "ABC", &Font24, BLUE, CYAN);
+
+  // Paint_DrawString_CN(10, 150, "微", &Font24CN,WHITE, RED);
+  // Paint_DrawString_CN(45, 150, "雪", &Font24CN,WHITE, RED);
+  // Paint_DrawString_CN(80, 150, "电", &Font24CN,WHITE, RED);
+  Paint_DrawString_CN(115, 150, "子", &Font24CN, WHITE, RED);
+
+  Paint_DrawImage(gImage_70X70, 10, 70, 70, 70);
+
+  Paint_DrawRectangle(100, 20, 160, 120, RED, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  Paint_DrawLine(100, 20, 160, 120, MAGENTA, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+  Paint_DrawLine(100, 120, 160, 20, MAGENTA, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+
+  Paint_DrawCircle(50, 220, 25, BLUE, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  Paint_DrawCircle(80, 220, 25, BLACK, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  Paint_DrawCircle(110, 220, 25, RED, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  Paint_DrawCircle(65, 245, 25, YELLOW, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+  Paint_DrawCircle(95, 245, 25, GREEN, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+
+  delay(300);
+
+  while (client.available())
+  {
+    char c = client.read();
+    Serial.print(c);
+  }
+
+  // if the server's disconnected, stop the client:
+  if (!client.connected())
+  {
+    Serial.println();
+    Serial.println("disconnecting.");
+    client.stop();
+
+    // do nothing forevermore:
+    // while (true);
+  }
+#endif
 }
+
+// #include "SoftwareSerial.h"
+
+// SoftwareSerial swSer(21, 14, false, 256);
+
+// void setup()
+// {
+//   swSer.begin(115200);
+//   Serial.begin(115200);
+//   // swSer.listen();
+// }
+
+// void loop()
+// {
+//   // swSer.println("Hello Software Serial");
+//   while (swSer.available() > 0) {
+//     Serial.write(swSer.read());
+//   }
+//   while (Serial.available() > 0) {
+//     char a = Serial.read();
+//     swSer.write(a);
+//     Serial.write(a);
+//   }
+//   // Serial.println(swSer.isListening()?"yes":"no");
+//   // delay(1000);
+// }
+
+// #include <HardwareSerial.h>
+
+// HardwareSerial SerialPort(1); // use UART1
+
+// void setup()
+// {
+//   pinMode(37,INPUT);
+//   pinMode(38,INPUT);
+// }
+
+// void loop()
+// {
+
+// }
+
+// void setup()
+// {
+//   SerialPort.begin(115200, SERIAL_8N1, 13, 12);
+//   Serial.begin(115200);
+//   pinMode(8,OUTPUT);
+//   // swSer.listen();
+// }
+
+// void loop()
+// {
+//   // swSer.println("Hello Software Serial");
+//   while (SerialPort.available() > 0) {
+//     Serial.write(SerialPort.read());
+//   }
+//   while (Serial.available() > 0) {
+//     char a = Serial.read();
+//     SerialPort.write(a);
+//     Serial.write(a);
+//   }
+//   // Serial.println(swSer.isListening()?"yes":"no");
+//   // delay(1000);
+//   // digitalWrite(8,HIGH);
+//   // delay(5000);
+//   // digitalWrite(8,LOW);
+//   // delay(5000);
+// }
+
+/*
+  Web client
+
+ This sketch connects to a website (http://www.google.com)
+ using an Arduino Wiznet Ethernet shield.
+
+ Circuit:
+ * Ethernet shield attached to pins 10, 11, 12, 13
+
+ created 18 Dec 2009
+ by David A. Mellis
+ modified 9 Apr 2012
+ by Tom Igoe, based on work by Adrian McEwen
+
+ */
+
+// #include <SPI.h>
+// #include <Ethernet2.h>
+
+// // Enter a MAC address for your controller below.
+// // Newer Ethernet shields have a MAC address printed on a sticker on the shield
+// byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+// // if you don't want to use DNS (and reduce your sketch size)
+// // use the numeric IP instead of the name for the server:
+// //IPAddress server(74,125,232,128);  // numeric IP for Google (no DNS)
+// char server[] = "www.taobao.com";    // name address for Google (using DNS)
+
+// // Set the static IP address to use if the DHCP fails to assign
+// IPAddress ip(192, 168, 13, 177);
+
+// // Initialize the Ethernet client library
+// // with the IP address and port of the server
+// // that you want to connect to (port 80 is default for HTTP):
+// EthernetClient client;
+
+// void setup() {
+//   // Open serial communications and wait for port to open:
+//   Serial.begin(115200);
+//   while (!Serial) {
+//     ; // wait for serial port to connect. Needed for Leonardo only
+//   }
+//   Ethernet.init(45);
+
+//   // start the Ethernet connection:
+//   if (Ethernet.begin(mac) == 0) {
+//     Serial.println("Failed to configure Ethernet using DHCP");
+//     // no point in carrying on, so do nothing forevermore:
+//     // try to congifure using IP address instead of DHCP:
+//     Ethernet.begin(mac, ip);
+//   }
+//   // give the Ethernet shield a second to initialize:
+//   delay(1000);
+//   Serial.println("connecting...");
+
+//   // if you get a connection, report back via serial:
+//   if (client.connect(server, 80)) {
+//     Serial.println("connected");
+//     // Make a HTTP request:
+//     client.println("GET /search?q=arduino HTTP/1.1");
+//     client.println("Host: www.baidu.com");
+//     client.println("Connection: close");
+//     client.println();
+//   }
+//   else {
+//     // kf you didn't get a connection to the server:
+//     Serial.println("connection failed");
+//   }
+// }
+
+// void loop()
+// {
+//   // if there are incoming bytes available
+//   // from the server, read them and print them:
+//   if (client.available()) {
+//     char c = client.read();
+//     Serial.print(c);
+//   }
+
+//   // if the server's disconnected, stop the client:
+//   if (!client.connected()) {
+//     Serial.println();
+//     Serial.println("disconnecting.");
+//     client.stop();
+
+//     // do nothing forevermore:
+//     while (true);
+//   }
+// }
+// #include "EspUsbHost.h"
+
+// class MyEspUsbHost : public EspUsbHost {
+//   void onKeyboardKey(uint8_t ascii, uint8_t keycode, uint8_t modifier) {
+//     if (' ' <= ascii && ascii <= '~') {
+//       Serial.printf("%c", ascii);
+//     } else if (ascii == '\r') {
+//       Serial.println();
+//     }
+//   };
+// };
+
+// MyEspUsbHost usbHost;
+
+// void setup() {
+//   Serial.begin(115200);
+//   delay(500);
+
+//   usbHost.begin();
+//   usbHost.setHIDLocal(HID_LOCAL_Japan_Katakana);
+// }
+
+// void loop() {
+//   usbHost.task();
+// }
 
 #endif
