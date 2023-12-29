@@ -18,7 +18,11 @@ private:
 
     SerialType _serialType;
 
-    ConnectionBaseDelegate* _delegate = nullptr;
+    HardwareSerial* _hardSerial = nullptr;
+
+    String test;
+
+    bool _synchronous = false;
 
 public:
 
@@ -29,6 +33,16 @@ public:
     bool init(uint8_t txPin,uint8_t rxPin); //初始化软串口
 
     bool init(HardwareSerial* serial);      //初始化硬串口
+
+    void clear(); //清空串口缓存
+
+    String readString(); //读取串口数据
+
+    void sendString(uint16_t pid, const String& data);
+
+    String sendString(uint16_t pid, const String& data, float timeout); //发送字符串并等待返回
+
+    void receivedData(const String &data);
 
     void loop();
 

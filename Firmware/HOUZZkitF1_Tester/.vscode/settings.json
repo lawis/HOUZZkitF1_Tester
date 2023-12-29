@@ -51,6 +51,15 @@
         "list": "cpp",
         "glcdfont.c": "cpp",
         "queue": "cpp",
-        "string_view": "cpp"
+        "string_view": "cpp",
+        "atomic": "cpp",
+        "condition_variable": "cpp",
+        "iterator": "cpp",
+        "map": "cpp",
+        "memory_resource": "cpp",
+        "optional": "cpp",
+        "set": "cpp",
+        "iostream": "cpp",
+        "thread": "cpp"
     }
 }

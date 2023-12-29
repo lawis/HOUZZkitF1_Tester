@@ -14,6 +14,26 @@
 class LedMatrix;
 class LcdDisplay;
 
+enum FunctionStatus
+{
+    FS_CHECK_1 = 1,
+    FS_CHECK_2,
+    FS_CHECK_3,
+    FS_CHECK_4,
+    FS_CHECK_5,
+    FS_PASS,
+    FS_FAIL
+};
+
+enum FunctionList
+{
+    FL_SERVER_CONNECT = 1,
+    FL_DEVICE_POWER_ON ,
+    FL_DEVICE_CONNECTED,
+    FL_DEVICE_ACTIVED,
+    FL_HOST_USB,
+};
+
 class ScreenManager
 {
 public:
@@ -35,6 +55,10 @@ public:
     static ScreenManager* getInstance();
 
     void initScreen();
+
+    void showDeviceStatus(FunctionList functionList,FunctionStatus functionStatus);
+
+    void ledCheck();
 
 };
 

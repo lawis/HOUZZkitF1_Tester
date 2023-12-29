@@ -2,14 +2,20 @@
 #define __HFT_CONNECTION_MANAGER_H__
 
 #include "HFTEthernetConnection.h"
+#include "HFTSerialConnection.h"
 #include "SDTProtocol.h"
 
 class ConnectionManager : public Protocols , ConnectionBaseDelegate
 {
 
+private:
+
+    bool _device_connected = false;
+
 public:
 
     EthernetConnection* ethernetConn = nullptr;
+    SerialConnection* serialConn = nullptr;
     
 protected:
 
@@ -28,9 +34,16 @@ public:
 
     void loop();
 
-    void dataParse(std::string& data,ConnectionBase* connection);
+    void reset();
+
+    void dataParse(const String& data,ConnectionBase* connection);
 
     void dataParse(uint8_t* data, size_t length,ConnectionBase* connection);
+
+    void dataParse(uint16_t pid, const String &data);
+
+    bool deviceConnected(){return _device_connected;};
+    
 
 };
 

@@ -31,7 +31,7 @@ void W5500Class::init(uint8_t ss_pin)
 
   delay(1000);
   initSS();
-  SPI_ETHERNET.begin(46,48,47,45);
+  SPI_ETHERNET.begin(21,48,47,45);
 //   SPI_ETHERNET.setHwCs(true);
   
   w5500.swReset();

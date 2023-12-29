@@ -5,8 +5,8 @@
 #include "HFTConnectionBase.h"
 #include <map>
 
-#define VERIFICATION_SERVER_HOST "192.168.13.110"
-#define VERIFICATION_SERVER_PORT 80
+#define VERIFICATION_SERVER_HOST "http://192.168.13.110"
+// #define VERIFICATION_SERVER_PORT 80
 
 class EthernetConnection : public ConnectionBase
 {
@@ -20,12 +20,15 @@ private:
         EC_CONNECTED = 3,
         EC_CONNECT_FAILED = 4,
         EC_CONNECTION_LOST = 5,
-        EC_DISCONNECTED = 6
+        EC_DISCONNECTED = 6,
+        EC_DHCP_FAILED = 7
     } ec_status_t;
 
     ec_status_t _status = EC_IDLE_STATUS;
 
-    String httpRequest(const String &host, const uint16_t port, const String &api, int *errCode,const String& body);
+    String payloadCreator(const std::map<String,String>& payloadMap);
+
+    String httpRequest(const String &url, int *errCode,const std::map<String,String>& payloadMap,const std::map<String,String>& headerMap);
 
 public:
     EthernetConnection(ConnectionBaseDelegate *delegate);
@@ -36,7 +39,10 @@ public:
 
     void loop();
 
-    bool connected();
+    bool serverConnected();
+
+    bool ethernetReady();
+
     
 };
 

@@ -25,6 +25,68 @@ void ScreenManager::initScreen()
     lcdDisplay->initDisplay();
 }
 
+void ScreenManager::showDeviceStatus(FunctionList functionList, FunctionStatus functionStatus)
+{
+    CRGB color = CRGB::Black;
+    switch (functionStatus)
+    {
+    case FS_CHECK_1:
+        color = CRGB::Orange;
+        break;
+    case FS_CHECK_2:
+        color = CRGB::Yellow;
+        break;
+    case FS_CHECK_3:
+        color = CRGB::Cyan;
+        break;
+    case FS_CHECK_4:
+        color = CRGB::Blue;
+        break;
+    case FS_CHECK_5:
+        color = CRGB::Purple;
+        break;
+    case FS_PASS:
+        color = CRGB::Green;
+        break;
+    case FS_FAIL:
+        color = CRGB::Red;
+        break;
+    }
+    ledMatrix->setPixel(functionList, color);
+    ledMatrix->show();
+}
+
+void ScreenManager::ledCheck()
+{
+    while (1)
+    {
+        ledMatrix->clear();
+        Serial.println(ledMatrix->getLedCount());
+        for (int i = 0; i < ledMatrix->getLedCount(); i++)
+        {
+            ledMatrix->setPixel(i, CRGB::Red);
+        }
+        ledMatrix->show();
+        delay(1000);
+
+        ledMatrix->clear();
+        for (int i = 0; i < ledMatrix->getLedCount(); i++)
+        {
+            ledMatrix->setPixel(i, CRGB::Green);
+        }
+        ledMatrix->show();
+        delay(1000);
+
+        ledMatrix->clear();
+        for (int i = 0; i < ledMatrix->getLedCount(); i++)
+        {
+            ledMatrix->setPixel(i, CRGB::Blue);
+        }
+        ledMatrix->show();
+        delay(1000);
+    }
+}
+
 //=====================LedMatrix==================//
 
 LedMatrix::~LedMatrix()
@@ -89,7 +151,7 @@ void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
 
 void LcdDisplay::initDisplay()
 {
-    bus = new Arduino_ESP32SPI(42, 41, 40, 39, -1, HSPI);
+    bus = new Arduino_ESP32SPI(13, 10, 12, 11, -1, HSPI);
     // gfx = new Arduino_GC9A01(bus, 19, 0, true);
     gfx = new Arduino_ST7789(bus, 2, 0, true);
     gfx->begin();
@@ -137,9 +199,6 @@ void LcdDisplay::loop()
     vTaskDelay(5);
 }
 
-
-    
-
 void lv_panel_slide_right_value(lv_obj_t *obj, int16_t value)
 {
     lv_obj_t *scrObj = panelArr[panelPointer + 1];
@@ -181,13 +240,13 @@ void LcdDisplay::right_slide()
     }
 }
 
-void lv_panel_slide_left_value(lv_obj_t * obj, int16_t value)
+void lv_panel_slide_left_value(lv_obj_t *obj, int16_t value)
 {
-  lv_obj_t *scrObj = panelArr[panelPointer-1];
-  lv_obj_t *desObj = panelArr[panelPointer];
-  lv_obj_set_x(scrObj,-value);
-  lv_obj_set_x(desObj,240-value);
-  // Serial.printf("value :%d\n",value);
+    lv_obj_t *scrObj = panelArr[panelPointer - 1];
+    lv_obj_t *desObj = panelArr[panelPointer];
+    lv_obj_set_x(scrObj, -value);
+    lv_obj_set_x(desObj, 240 - value);
+    // Serial.printf("value :%d\n",value);
 }
 
 void LcdDisplay::left_slide()
