@@ -1,6 +1,8 @@
 #! /bin/bash -e
 # Hacked together by Thorsten von Eicken in 2019
-XTENSA_GDB=~/.platformio/packages/toolchain-xtensa32/bin/xtensa-esp32-elf-gdb
+XTENSA_GDB="C:\Users\Lawis\.platformio\packages\toolchain-xtensa-esp32s3\bin\xtensa-esp32s3-elf-gdb.exe"
+
+echo "test"
 
 # Validate commandline arguments
 if [ -z "$1" ]; then

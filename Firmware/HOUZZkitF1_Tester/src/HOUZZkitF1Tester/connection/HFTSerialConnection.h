@@ -13,6 +13,7 @@ private:
     enum SerialType
     {
         ST_HARD = 1,
+        ST_HARD_INNER,
         ST_SOFT
     };
 
@@ -32,6 +33,8 @@ public:
 
     bool init(uint8_t txPin,uint8_t rxPin); //初始化软串口
 
+    bool initInner(uint8_t rxPin,uint8_t txPin); //初始化内部硬串口
+
     bool init(HardwareSerial* serial);      //初始化硬串口
 
     void clear(); //清空串口缓存
@@ -41,6 +44,8 @@ public:
     void sendString(uint16_t pid, const String& data);
 
     String sendString(uint16_t pid, const String& data, float timeout); //发送字符串并等待返回
+
+    String readString(float timeout);
 
     void receivedData(const String &data);
 

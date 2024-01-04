@@ -26,7 +26,8 @@ def main():
         f.write('\n')
         f.close()
     cmd = "cd " + CurrentPath + "\n "
-    cmd += "./esp32-backtrace "+ CurrentPath +"../../.pio/build/esp32dev/firmware.elf debug.txt"
+    cmd += "./esp32-backtrace.sh "+ CurrentPath +"../../.pio/build/esp32s3/firmware.elf debug.txt"
+    print(cmd)
     cmdRes = os.popen(cmd)
     res = cmdRes.read()
     os.remove(CurrentPath+'debug.txt')

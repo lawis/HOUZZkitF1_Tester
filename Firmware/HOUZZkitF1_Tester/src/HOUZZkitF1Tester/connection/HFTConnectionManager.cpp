@@ -33,6 +33,13 @@ bool ConnectionManager::init()
     return true;
 }
 
+bool ConnectionManager::initRS485()
+{
+    serialRS485 = new SerialConnection(this);
+    serialRS485->init(&Serial1);
+    return true;
+}
+
 void ConnectionManager::loop()
 {
     ethernetConn->loop();

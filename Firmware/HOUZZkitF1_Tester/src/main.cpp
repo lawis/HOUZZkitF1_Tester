@@ -1,5 +1,5 @@
 #include <Arduino.h>
-
+#include <HardwareSerial.h>
 // #define UNIT_TEST
 
 #ifndef UNIT_TEST
@@ -64,31 +64,528 @@ void checkFlow_3(uint16_t *errCode)
 
 void checkFlow_4(uint16_t *errCode)
 {
-  m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVED, FS_CHECK_1);
-  String res = m_connectionManager->serialConn->sendString(FL_DEVICE_ACTIVED, "device_actived", 2);
+  m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_DEVICE_ACTIVATED, "device_activated", 2);
   if (res.length() == 0)
   {
     *errCode = 10401;
-    m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVED, FS_FAIL);
+    m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_FAIL);
     return;
   }
   if (res == "ok")
   {
-    m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVED, FS_PASS);
+    m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_PASS);
     return;
   }
-  m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVED, FS_FAIL);
+  m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_FAIL);
   *errCode = 10402;
 }
 
-void checkFlowAction()
+void checkFlow_5(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_HOST_USB, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_HOST_USB, "host_usb", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 10501;
+    m_screenManager->showDeviceStatus(FL_HOST_USB, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_HOST_USB, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_HOST_USB, FS_FAIL);
+  *errCode = 10502;
+}
+
+void checkFlow_6(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_DDR, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_DDR, "ddr", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 10601;
+    m_screenManager->showDeviceStatus(FL_DDR, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_DDR, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_DDR, FS_FAIL);
+  *errCode = 10602;
+}
+
+void checkFlow_7(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_EMMC, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_EMMC, "emmc", 15);
+  if (res.length() == 0)
+  {
+    *errCode = 10701;
+    m_screenManager->showDeviceStatus(FL_EMMC, FS_FAIL);
+    return;
+  }
+  if(res.toFloat() < 5.0)
+  {
+    m_screenManager->showDeviceStatus(FL_EMMC, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_EMMC, FS_FAIL);
+  *errCode = 10702;
+}
+
+void checkFlow_8(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_RTC, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_RTC, "rtc", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 10801;
+    m_screenManager->showDeviceStatus(FL_RTC, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_RTC, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_RTC, FS_FAIL);
+  *errCode = 10802;
+}
+
+void checkFlow_9(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_IIC_ENCRYPT, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_IIC_ENCRYPT, "iic_encrypt", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 10901;
+    m_screenManager->showDeviceStatus(FL_IIC_ENCRYPT, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_IIC_ENCRYPT, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_IIC_ENCRYPT, FS_FAIL);
+  *errCode = 10902;
+}
+
+void rs485CheckFlow(void *pvParameters)
+{
+  SerialConnection rs485Serial(nullptr);
+  rs485Serial.initInner(9,46);
+  String res = rs485Serial.readString(5);
+  if (res == "10:ping")
+  {
+    rs485Serial.sendString(10, "pong");
+  }
+  vTaskDelete(NULL);
+}
+
+void checkFlow_10(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_RS485, FS_CHECK_1);
+
+  xTaskCreatePinnedToCore(rs485CheckFlow, "rs485CheckFlow", 8192, NULL, 1, NULL, 0);
+  String res = m_connectionManager->serialConn->sendString(FL_RS485, "rs485", 5);
+  if (res.length() == 0)
+  {
+    *errCode = 11001;
+    m_screenManager->showDeviceStatus(FL_RS485, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_RS485, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_RS485, FS_FAIL);
+  *errCode = 11002;
+}
+
+// //SerialRS485.begin(115200, SERIAL_8N1, 40, 39);   RS232 M1
+
+// //SerialRS485.begin(115200, SERIAL_8N1, 42, 41);   RS232 M2
+
+void rs232M1CheckFlow(void *pvParameters)
+{
+  SerialConnection rs232Serial(nullptr);
+  rs232Serial.initInner(40,39);
+  String res = rs232Serial.readString(10);
+  if (res == "11:ping")
+  {
+    rs232Serial.sendString(11, "pong");
+  }
+  vTaskDelete(NULL);
+}
+
+void rs232M2CheckFlow(void *pvParameters)
+{
+  SerialConnection rs232Serial(nullptr);
+  rs232Serial.initInner(42,41);
+  String res = rs232Serial.readString(10);
+  if (res == "11:ping")
+  {
+    rs232Serial.sendString(11, "pong");
+  }
+  vTaskDelete(NULL);
+}
+
+void checkFlow_11(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_RS232, FS_CHECK_1);
+
+  xTaskCreatePinnedToCore(rs232M1CheckFlow, "rs232M1CheckFlow", 8192, NULL, 1, NULL, 0);
+  delay(500);
+  String res = m_connectionManager->serialConn->sendString(FL_RS232, "/dev/ttyS9", 5);
+  if (res.length() == 0)
+  {
+    *errCode = 11001;
+    m_screenManager->showDeviceStatus(FL_RS232, FS_FAIL);
+    return;
+  }
+  if (res != "ok")
+  {
+    *errCode = 11002;
+    m_screenManager->showDeviceStatus(FL_RS232, FS_FAIL);
+    return;
+  }
+
+  m_screenManager->showDeviceStatus(FL_RS232, FS_CHECK_2);
+  xTaskCreatePinnedToCore(rs232M2CheckFlow, "rs232M2CheckFlow", 8192, NULL, 1, NULL, 0);
+  delay(500);
+  res = m_connectionManager->serialConn->sendString(FL_RS232, "/dev/ttyS4", 5);
+  if (res.length() == 0)
+  {
+    *errCode = 11003;
+    m_screenManager->showDeviceStatus(FL_RS232, FS_FAIL);
+    return;
+  }
+  if (res != "ok")
+  {
+    *errCode = 11004;
+    m_screenManager->showDeviceStatus(FL_RS232, FS_FAIL);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_RS232, FS_PASS);
+}
+
+void checkFlow_12(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_SSD, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_SSD, "ssd", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 11201;
+    m_screenManager->showDeviceStatus(FL_SSD, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_SSD, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_SSD, FS_FAIL);
+  *errCode = 11202;
+}
+
+void checkFlow_13(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_TF, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_TF, "tf", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 11301;
+    m_screenManager->showDeviceStatus(FL_TF, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_TF, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_TF, FS_FAIL);
+  *errCode = 11302;
+}
+
+void gpioCheck(uint16_t *errCode)
+{
+  
+}
+
+void checkFlow_14(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_GPIO, "3A40", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 11401;
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
+  *errCode = 11402;
+}
+
+void checkFlow_15(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_PWM, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_PWM, "pwm", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 11501;
+    m_screenManager->showDeviceStatus(FL_PWM, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_PWM, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_PWM, FS_FAIL);
+  *errCode = 11502;
+}
+
+void checkFlow_16(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_WAN, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_WAN, "wan", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 11601;
+    m_screenManager->showDeviceStatus(FL_WAN, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_WAN, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_WAN, FS_FAIL);
+  *errCode = 11602;
+}
+
+void checkFlow_17(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_LAN, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_LAN, "lan", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 11701;
+    m_screenManager->showDeviceStatus(FL_LAN, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_LAN, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_LAN, FS_FAIL);
+  *errCode = 11702;
+}
+
+void checkFlow_18(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_WIFI, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_WIFI, "wifi", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 11801;
+    m_screenManager->showDeviceStatus(FL_WIFI, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_WIFI, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_WIFI, FS_FAIL);
+  *errCode = 11802;
+}
+
+void checkFlow_19(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_BLUETOOTH, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_BLUETOOTH, "bluetooth", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 11901;
+    m_screenManager->showDeviceStatus(FL_BLUETOOTH, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_BLUETOOTH, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_BLUETOOTH, FS_FAIL);
+  *errCode = 11902;
+}
+
+void checkFlow_20(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_ZIGBEE, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_ZIGBEE, "zigbee", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 12001;
+    m_screenManager->showDeviceStatus(FL_ZIGBEE, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_ZIGBEE, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_ZIGBEE, FS_FAIL);
+  *errCode = 12002;
+}
+
+void checkFlow_21(uint16_t *errCode)
+{
+  // m_screenManager->showDeviceStatus(FL_HDMI, FS_CHECK_1);
+  // String res = m_connectionManager->serialConn->sendString(FL_HDMI, "zigbee", 2);
+  // if (res.length() == 0)
+  // {
+  //   *errCode = 12101;
+  //   m_screenManager->showDeviceStatus(FL_HDMI, FS_FAIL);
+  //   return;
+  // }
+  // if (res == "ok")
+  // {
+  //   m_screenManager->showDeviceStatus(FL_HDMI, FS_PASS);
+  //   return;
+  // }
+  // m_screenManager->showDeviceStatus(FL_HDMI, FS_FAIL);
+  // *errCode = 12102;
+}
+
+void checkFlow_22(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_IIC_INTERFACE, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_IIC_INTERFACE, "iic_interface", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 12201;
+    m_screenManager->showDeviceStatus(FL_IIC_INTERFACE, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_IIC_INTERFACE, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_IIC_INTERFACE, FS_FAIL);
+  *errCode = 12202;
+}
+
+void checkFlow_23(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_MICROPHONE, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_MICROPHONE, "microphone", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 12301;
+    m_screenManager->showDeviceStatus(FL_MICROPHONE, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_MICROPHONE, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_MICROPHONE, FS_FAIL);
+  *errCode = 12302;
+}
+
+void checkFlow_24(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_JACKPOT, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_JACKPOT, "jackpot", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 12401;
+    m_screenManager->showDeviceStatus(FL_JACKPOT, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_JACKPOT, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_JACKPOT, FS_FAIL);
+  *errCode = 12402;
+}
+
+void checkFlow_25(uint16_t *errCode)
+{
+  m_screenManager->showDeviceStatus(FL_MIPI, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_MIPI, "mipi", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 12501;
+    m_screenManager->showDeviceStatus(FL_MIPI, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_MIPI, FS_PASS);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_MIPI, FS_FAIL);
+  *errCode = 12502;
+}
+
+void activateDevice(uint16_t *errCode)
+{
+
+}
+
+uint16_t checkFlowAction()
 {
   uint16_t errCode = 0;
+  bool deviceActivated = false;
   m_connectionManager->reset();
-  checkFlow_1(&errCode);if (errCode != 0){return;}
-  checkFlow_2(&errCode);if (errCode != 0){return;}
-  checkFlow_3(&errCode);if (errCode != 0){return;}
-  checkFlow_4(&errCode);if (errCode != 0){return;}
+  checkFlow_1(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_2(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_3(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_4(&errCode);if (errCode == 0){deviceActivated = true;}
+  checkFlow_5(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_6(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_7(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_8(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_9(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_10(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_11(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_12(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_13(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_14(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_15(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_16(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_17(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_18(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_19(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_20(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_21(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_22(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_23(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_24(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_25(&errCode);if (errCode != 0){return errCode;}
+  if (!deviceActivated)
+  {
+    activateDevice(&errCode);if (errCode != 0){return errCode;}
+  }
 }
 
 void encoderButtonClick()
@@ -239,7 +736,8 @@ void connectTask(void *pvParameters)
 
 // void setup()
 // {
-//   SerialRS485.begin(115200, SERIAL_8N1, 42, 41);
+//   // SerialRS485.begin(115200, SERIAL_8N1, 9, 46);
+//   SerialRS485.begin(9600, SERIAL_8N1, 42, 41);
 //   Serial.begin(115200);
 //   // pinMode(8,OUTPUT);
 //   // swSer.listen();
@@ -421,40 +919,43 @@ void connectTask(void *pvParameters)
  * Basic input/output test for MCP23016 expander.
  */
 
-// #include "CyMCP23016.h"
+#include "CyMCP23016.h"
 
-// #ifdef ESP8266
-// #define PIN_SDA 4
-// #define PIN_SCL 5
-// #endif
+CyMCP23016 mcpU6;
+CyMCP23016 mcpU7;
 
-// CyMCP23016 mcp;
+void setup() {
+    Serial.begin(115200);
 
-// void setup() {
-//     Serial.begin(115200);
+    mcpU6.begin(17, 18, 0x26);
 
-//     mcp.begin(17, 18, 0x26);
+    mcpU7.begin(17, 18, 0x27);
 
-//     // Set Pin 0 on Port 0 as an output.
-//     mcp.pinMode(MCP23016_PIN_GPIO1_0, OUTPUT);
-// }
+    // Set Pin 0 on Port 0 as an output.
+    mcpU6.pinMode(MCP23016_PIN_GPIO1_5, INPUT_PULLDOWN);
+    mcpU7.pinMode(MCP23016_PIN_GPIO1_0, INPUT_PULLDOWN);
+}
 
-// void loop() {
-//     delay(1000);
+void loop() {
+    delay(400);
 
-//     // Set the pin HIGH and read back the state.
-//     mcp.digitalWrite(MCP23016_PIN_GPIO1_0, HIGH);
-//     uint8_t val = mcp.digitalRead(MCP23016_PIN_GPIO1_0);
-//     Serial.print(F("Pin 0.0 is "));
-//     Serial.println(val == HIGH ? "HIGH" : "LOW");
+    // Set the pin HIGH and read back the state.
+    // mcp.digitalWrite(MCP23016_PIN_GPIO1_0, HIGH);
+    uint8_t val = mcpU6.digitalRead(MCP23016_PIN_GPIO1_5);
+    Serial.print(F("U6 1.5 is "));
+    Serial.println(val == HIGH ? "HIGH" : "LOW");
 
-//     delay(1000);
+    val = mcpU7.digitalRead(MCP23016_PIN_GPIO1_0);
+    Serial.print(F("U7 0.2 is "));
+    Serial.println(val == HIGH ? "HIGH" : "LOW");
 
-//     // Set the pin LOW and read back the state.
-//     mcp.digitalWrite(MCP23016_PIN_GPIO1_0, LOW);
-//     val = mcp.digitalRead(MCP23016_PIN_GPIO1_0);
-//     Serial.print(F("Pin 0.0 is "));
-//     Serial.println(val == HIGH ? "HIGH" : "LOW");
-// }
+    // delay(1000);
+
+    // // Set the pin LOW and read back the state.
+    // mcp.digitalWrite(MCP23016_PIN_GPIO1_0, LOW);
+    // val = mcp.digitalRead(MCP23016_PIN_GPIO1_0);
+    // Serial.print(F("Pin 0.0 is "));
+    // Serial.println(val == HIGH ? "HIGH" : "LOW");
+}
 
 #endif

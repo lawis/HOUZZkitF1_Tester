@@ -52,7 +52,7 @@ void ScreenManager::showDeviceStatus(FunctionList functionList, FunctionStatus f
         color = CRGB::Red;
         break;
     }
-    ledMatrix->setPixel(functionList, color);
+    ledMatrix->setPixel(functionList-1, color);
     ledMatrix->show();
 }
 

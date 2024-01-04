@@ -7,12 +7,24 @@ SerialConnection::SerialConnection(ConnectionBaseDelegate *delegate)
 
 SerialConnection::~SerialConnection()
 {
+    if (_serialType == ST_HARD_INNER)
+    {
+        delete _hardSerial;
+        _hardSerial = nullptr;
+    }
 }
 
 bool SerialConnection::init(uint8_t txPin, uint8_t rxPin)
 {
-
     _serialType = ST_SOFT;
+    return false;
+}
+
+bool SerialConnection::initInner(uint8_t rxPin,uint8_t txPin)
+{
+    _hardSerial = new HardwareSerial(1);
+    _hardSerial->begin(115200, SERIAL_8N1, rxPin, txPin);  //RS485
+    _serialType = ST_HARD_INNER;
     return false;
 }
 
@@ -28,6 +40,7 @@ void SerialConnection::clear()
     switch (_serialType)
     {
     case ST_HARD:
+    case ST_HARD_INNER:
         while (_hardSerial->available())
         {
             _hardSerial->read();
@@ -47,6 +60,7 @@ String SerialConnection::readString()
     switch (_serialType)
     {
     case ST_HARD:
+    case ST_HARD_INNER:
         while (_hardSerial->available())
         {
             char data = _hardSerial->read();
@@ -67,6 +81,7 @@ void SerialConnection::sendString(uint16_t pid, const String &data)
     switch (_serialType)
     {
     case ST_HARD:
+    case ST_HARD_INNER:
     {
         String msg = String(pid) + ":" + data;
         _hardSerial->print(msg);
@@ -84,6 +99,7 @@ void SerialConnection::sendString(uint16_t pid, const String &data)
 
 String SerialConnection::sendString(uint16_t pid, const String &data, float timeout)
 {
+    timeout = 100;
     _synchronous = true;
     String res;
     this->clear();
@@ -109,6 +125,25 @@ String SerialConnection::sendString(uint16_t pid, const String &data, float time
                 continue;
             }
             res = res.substring(index + 1);
+            break;
+        }
+    }
+    _synchronous = false;
+    return res;
+}
+
+String SerialConnection::readString(float timeout)
+{
+    _synchronous = true;
+    String res;
+    this->clear();
+    unsigned long start = millis();
+    while (millis() - start < timeout * 1000)
+    {
+        delay(100);
+        res = this->readString();
+        if (res.length() > 0)
+        {
             break;
         }
     }
@@ -143,6 +178,7 @@ void SerialConnection::loop()
     switch (_serialType)
     {
     case ST_HARD:
+    case ST_HARD_INNER:
         while (_hardSerial->available())
         {
             char data = _hardSerial->read();

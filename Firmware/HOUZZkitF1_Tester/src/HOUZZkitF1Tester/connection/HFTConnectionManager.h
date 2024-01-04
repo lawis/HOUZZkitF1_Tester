@@ -16,6 +16,7 @@ public:
 
     EthernetConnection* ethernetConn = nullptr;
     SerialConnection* serialConn = nullptr;
+    SerialConnection* serialRS485 = nullptr;
     
 protected:
 
@@ -31,6 +32,8 @@ public:
     static ConnectionManager* getInstance();
 
     bool init();
+
+    bool initRS485();
 
     void loop();
 
