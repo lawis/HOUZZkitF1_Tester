@@ -37,7 +37,7 @@
 #define MCP23016_PIN_GPIO0_4 4  // Port 0, Pin 4
 #define MCP23016_PIN_GPIO0_5 5  // Port 0, Pin 5
 #define MCP23016_PIN_GPIO0_6 6  // Port 0, Pin 6
-#define MC2301P6_PIN_GPIO0_7 7  // Port 0, Pin 7
+#define MCP23016_PIN_GPIO0_7 7  // Port 0, Pin 7
 #define MCP23016_PIN_GPIO1_0 8  // Port 1, Pin 0
 #define MCP23016_PIN_GPIO1_1 9  // Port 1, Pin 1
 #define MCP23016_PIN_GPIO1_2 10 // Port 1, Pin 2 

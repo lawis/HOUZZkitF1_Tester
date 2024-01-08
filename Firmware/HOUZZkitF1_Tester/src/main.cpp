@@ -1,5 +1,8 @@
 #include <Arduino.h>
 #include <HardwareSerial.h>
+#include <WiFi.h>
+#include <WiFiAP.h>
+#include "EspUsbHost.h"
 // #define UNIT_TEST
 
 #ifndef UNIT_TEST
@@ -8,6 +11,8 @@
 #include "HOUZZkitF1Tester/device/HFTEncoder.h"
 #include "HOUZZkitF1Tester/device/HFTDevice.h"
 #include "HOUZZkitF1Tester/connection/HFTConnectionManager.h"
+
+#define ENCODER_BUTTON_PIN 6
 
 ScreenManager *m_screenManager = nullptr;
 HFTEncoder *m_hftEncoder = nullptr;
@@ -129,7 +134,7 @@ void checkFlow_7(uint16_t *errCode)
     m_screenManager->showDeviceStatus(FL_EMMC, FS_FAIL);
     return;
   }
-  if(res.toFloat() < 5.0)
+  if (res.toFloat() < 5.0)
   {
     m_screenManager->showDeviceStatus(FL_EMMC, FS_PASS);
     return;
@@ -179,7 +184,7 @@ void checkFlow_9(uint16_t *errCode)
 void rs485CheckFlow(void *pvParameters)
 {
   SerialConnection rs485Serial(nullptr);
-  rs485Serial.initInner(9,46);
+  rs485Serial.initInner(9, 46);
   String res = rs485Serial.readString(5);
   if (res == "10:ping")
   {
@@ -216,7 +221,7 @@ void checkFlow_10(uint16_t *errCode)
 void rs232M1CheckFlow(void *pvParameters)
 {
   SerialConnection rs232Serial(nullptr);
-  rs232Serial.initInner(40,39);
+  rs232Serial.initInner(40, 39);
   String res = rs232Serial.readString(10);
   if (res == "11:ping")
   {
@@ -228,7 +233,7 @@ void rs232M1CheckFlow(void *pvParameters)
 void rs232M2CheckFlow(void *pvParameters)
 {
   SerialConnection rs232Serial(nullptr);
-  rs232Serial.initInner(42,41);
+  rs232Serial.initInner(42, 41);
   String res = rs232Serial.readString(10);
   if (res == "11:ping")
   {
@@ -314,47 +319,201 @@ void checkFlow_13(uint16_t *errCode)
   *errCode = 11302;
 }
 
-void gpioCheck(uint16_t *errCode)
+void gpioCheck(uint16_t *errCode, const String &gpio, uint8_t uType, uint8_t pin)
 {
-  
+  String res = m_connectionManager->serialConn->sendString(FL_GPIO, gpio, 2);
+  if (res.length() == 0)
+  {
+    *errCode = 11401;
+    return;
+  }
+  if (res != "ok")
+  {
+    *errCode = 11402;
+    return;
+  }
+  uint8_t dr = 0;
+  switch (uType)
+  {
+  case 6:
+    dr = m_hftDevice->mcpU6Read(pin);
+    break;
+  case 7:
+    dr = m_hftDevice->mcpU7Read(pin);
+    break;
+  default:
+    *errCode = 11403;
+    return;
+  }
+  if (gpio.substring(3).toInt() != dr)
+  {
+    *errCode = 11404;
+    return;
+  }
 }
 
 void checkFlow_14(uint16_t *errCode)
 {
   m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_1);
-  String res = m_connectionManager->serialConn->sendString(FL_GPIO, "3A40", 2);
-  if (res.length() == 0)
+
+  gpioCheck(errCode, "3A40", 6, MCP23016_PIN_GPIO1_5);
+  if (errCode != 0)
   {
-    *errCode = 11401;
-    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
-  if (res == "ok")
+  gpioCheck(errCode, "3A41", 6, MCP23016_PIN_GPIO1_5);
+  if (errCode != 0)
   {
-    m_screenManager->showDeviceStatus(FL_GPIO, FS_PASS);
     return;
   }
-  m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
-  *errCode = 11402;
+
+  gpioCheck(errCode, "3A50", 6, MCP23016_PIN_GPIO1_6);
+  if (errCode != 0)
+  {
+    return;
+  }
+  gpioCheck(errCode, "3A51", 6, MCP23016_PIN_GPIO1_6);
+  if (errCode != 0)
+  {
+    return;
+  }
+
+  gpioCheck(errCode, "3A10", 6, MCP23016_PIN_GPIO0_7);
+  if (errCode != 0)
+  {
+    return;
+  }
+  gpioCheck(errCode, "3A11", 6, MCP23016_PIN_GPIO0_7);
+  if (errCode != 0)
+  {
+    return;
+  }
+
+  m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_2);
+
+  gpioCheck(errCode, "2D60", 6, MCP23016_PIN_GPIO0_6);
+  if (errCode != 0)
+  {
+    return;
+  }
+  gpioCheck(errCode, "2D61", 6, MCP23016_PIN_GPIO0_6);
+  if (errCode != 0)
+  {
+    return;
+  }
+
+  gpioCheck(errCode, "2D70", 6, MCP23016_PIN_GPIO0_4);
+  if (errCode != 0)
+  {
+    return;
+  }
+  gpioCheck(errCode, "2D71", 6, MCP23016_PIN_GPIO0_4);
+  if (errCode != 0)
+  {
+    return;
+  }
+
+  gpioCheck(errCode, "3A20", 6, MCP23016_PIN_GPIO0_5);
+  if (errCode != 0)
+  {
+    return;
+  }
+  gpioCheck(errCode, "3A21", 6, MCP23016_PIN_GPIO0_5);
+  if (errCode != 0)
+  {
+    return;
+  }
+
+  m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_3);
+
+  gpioCheck(errCode, "3A00", 6, MCP23016_PIN_GPIO0_2);
+  if (errCode != 0)
+  {
+    return;
+  }
+  gpioCheck(errCode, "3A01", 6, MCP23016_PIN_GPIO0_2);
+  if (errCode != 0)
+  {
+    return;
+  }
+
+  gpioCheck(errCode, "2D50", 6, MCP23016_PIN_GPIO0_3);
+  if (errCode != 0)
+  {
+    return;
+  }
+  gpioCheck(errCode, "2D51", 6, MCP23016_PIN_GPIO0_3);
+  if (errCode != 0)
+  {
+    return;
+  }
+
+  gpioCheck(errCode, "2D40", 6, MCP23016_PIN_GPIO0_1);
+  if (errCode != 0)
+  {
+    return;
+  }
+  gpioCheck(errCode, "2D41", 6, MCP23016_PIN_GPIO0_1);
+  if (errCode != 0)
+  {
+    return;
+  }
+
+  m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_4);
+
+  gpioCheck(errCode, "2D30", 7, MCP23016_PIN_GPIO1_0);
+  if (errCode != 0)
+  {
+    return;
+  }
+  gpioCheck(errCode, "2D31", 7, MCP23016_PIN_GPIO1_0);
+  if (errCode != 0)
+  {
+    return;
+  }
+
+  gpioCheck(errCode, "3C30", 7, MCP23016_PIN_GPIO1_1);
+  if (errCode != 0)
+  {
+    return;
+  }
+  gpioCheck(errCode, "3C31", 7, MCP23016_PIN_GPIO1_1);
+  if (errCode != 0)
+  {
+    return;
+  }
+
+  gpioCheck(errCode, "2D20", 7, MCP23016_PIN_GPIO0_6);
+  if (errCode != 0)
+  {
+    return;
+  }
+  gpioCheck(errCode, "2D21", 7, MCP23016_PIN_GPIO0_6);
+  if (errCode != 0)
+  {
+    return;
+  }
+
+  m_screenManager->showDeviceStatus(FL_GPIO, FS_PASS);
 }
 
 void checkFlow_15(uint16_t *errCode)
 {
-  m_screenManager->showDeviceStatus(FL_PWM, FS_CHECK_1);
-  String res = m_connectionManager->serialConn->sendString(FL_PWM, "pwm", 2);
-  if (res.length() == 0)
-  {
-    *errCode = 11501;
-    m_screenManager->showDeviceStatus(FL_PWM, FS_FAIL);
-    return;
-  }
-  if (res == "ok")
-  {
-    m_screenManager->showDeviceStatus(FL_PWM, FS_PASS);
-    return;
-  }
+  // m_screenManager->showDeviceStatus(FL_PWM, FS_CHECK_1);
+  // String res = m_connectionManager->serialConn->sendString(FL_PWM, "pwm", 2);
+  // if (res.length() == 0)
+  // {
+  //   *errCode = 11501;
+  //   m_screenManager->showDeviceStatus(FL_PWM, FS_FAIL);
+  //   return;
+  // }
+  // if (res == "ok")
+  // {
+  //   m_screenManager->showDeviceStatus(FL_PWM, FS_PASS);
+  //   return;
+  // }
   m_screenManager->showDeviceStatus(FL_PWM, FS_FAIL);
-  *errCode = 11502;
+  // *errCode = 11502;
 }
 
 void checkFlow_16(uint16_t *errCode)
@@ -398,20 +557,28 @@ void checkFlow_17(uint16_t *errCode)
 void checkFlow_18(uint16_t *errCode)
 {
   m_screenManager->showDeviceStatus(FL_WIFI, FS_CHECK_1);
-  String res = m_connectionManager->serialConn->sendString(FL_WIFI, "wifi", 2);
-  if (res.length() == 0)
+  if (!WiFi.softAP("HOUZZKitF1", "88888888"))
   {
     *errCode = 11801;
+    return;
+  }
+  String res = m_connectionManager->serialConn->sendString(FL_WIFI, "wifi", 15);
+  if (res.length() == 0)
+  {
+    *errCode = 11802;
     m_screenManager->showDeviceStatus(FL_WIFI, FS_FAIL);
+    WiFi.softAPdisconnect(true);
     return;
   }
   if (res == "ok")
   {
     m_screenManager->showDeviceStatus(FL_WIFI, FS_PASS);
+    WiFi.softAPdisconnect(true);
     return;
   }
   m_screenManager->showDeviceStatus(FL_WIFI, FS_FAIL);
-  *errCode = 11802;
+  WiFi.softAPdisconnect(true);
+  *errCode = 11803;
 }
 
 void checkFlow_19(uint16_t *errCode)
@@ -454,21 +621,20 @@ void checkFlow_20(uint16_t *errCode)
 
 void checkFlow_21(uint16_t *errCode)
 {
-  // m_screenManager->showDeviceStatus(FL_HDMI, FS_CHECK_1);
-  // String res = m_connectionManager->serialConn->sendString(FL_HDMI, "zigbee", 2);
-  // if (res.length() == 0)
-  // {
-  //   *errCode = 12101;
-  //   m_screenManager->showDeviceStatus(FL_HDMI, FS_FAIL);
-  //   return;
-  // }
-  // if (res == "ok")
-  // {
-  //   m_screenManager->showDeviceStatus(FL_HDMI, FS_PASS);
-  //   return;
-  // }
-  // m_screenManager->showDeviceStatus(FL_HDMI, FS_FAIL);
-  // *errCode = 12102;
+  m_screenManager->showDeviceStatus(FL_HDMI, FS_CHECK_1);
+  // TODO: 提示检测员肉眼检测HDMI到屏幕的输出
+  uint64_t checkStart = millis();
+  while (millis() - checkStart < 15 * 1000)
+  {
+    uint8_t rd = digitalRead(ENCODER_BUTTON_PIN);
+    if (rd == 0)
+    {
+      m_screenManager->showDeviceStatus(FL_HDMI, FS_PASS);
+      return;
+    }
+  }
+  m_screenManager->showDeviceStatus(FL_HDMI, FS_FAIL);
+  *errCode = 12101;
 }
 
 void checkFlow_22(uint16_t *errCode)
@@ -547,51 +713,213 @@ void checkFlow_25(uint16_t *errCode)
   *errCode = 12502;
 }
 
+
+
+class MyEspUsbHost : public EspUsbHost {
+public:
+  String snCode = "";
+  uint8_t snCodeRecived = 0;
+
+  void onKeyboardKey(uint8_t ascii, uint8_t keycode, uint8_t modifier) {
+    if (' ' <= ascii && ascii <= '~') {
+      // Serial.printf("%c", ascii);
+      snCode += ascii;
+    } else if (ascii == '\r') {
+      // Serial.println();
+      snCodeRecived = 1;
+    }
+  };
+};
+
 void activateDevice(uint16_t *errCode)
 {
+  //请求mac1 mac2 的地址
+  MyEspUsbHost usbHost;
+  usbHost.begin();
+  usbHost.setHIDLocal(HID_LOCAL_Japan_Katakana);
 
+  //提示扫码枪
+  uint64_t checkStart = millis();
+  while (millis() - checkStart < 30 * 1000)
+  {
+    usbHost.task();
+    if (usbHost.snCodeRecived)
+    {
+      //请求激活
+
+      return;
+    }
+  }
+  *errCode = 12601;
 }
+
 
 uint16_t checkFlowAction()
 {
   uint16_t errCode = 0;
   bool deviceActivated = false;
   m_connectionManager->reset();
-  checkFlow_1(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_2(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_3(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_4(&errCode);if (errCode == 0){deviceActivated = true;}
-  checkFlow_5(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_6(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_7(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_8(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_9(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_10(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_11(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_12(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_13(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_14(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_15(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_16(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_17(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_18(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_19(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_20(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_21(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_22(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_23(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_24(&errCode);if (errCode != 0){return errCode;}
-  checkFlow_25(&errCode);if (errCode != 0){return errCode;}
+  checkFlow_1(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_2(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_3(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_4(&errCode);
+  if (errCode == 0)
+  {
+    deviceActivated = true;
+  }
+  checkFlow_5(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_6(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_7(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_8(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_9(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_10(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_11(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_12(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_13(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_14(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_15(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_16(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_17(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_18(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_19(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_20(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_21(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_22(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_23(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_24(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  checkFlow_25(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
   if (!deviceActivated)
   {
-    activateDevice(&errCode);if (errCode != 0){return errCode;}
+    activateDevice(&errCode);
+    if (errCode != 0)
+    {
+      return errCode;
+    }
   }
+  return errCode;
+}
+
+int fullFlowRunning = 0;
+void fullFlowAction()
+{
+  fullFlowRunning = 1;
+  uint16_t errcode = checkFlowAction();
+  if (errcode == 0)
+  {
+    //提示测试成功
+  }else
+  {
+    //提示测试失败
+  }
+  //提示可以开始下一台设备的测试
+  m_hftDevice->relayOff();
+  
+  fullFlowRunning = 0;
 }
 
 void encoderButtonClick()
 {
   // Serial.println("encoderButtonClick");
-  checkFlowAction();
+  if (fullFlowRunning == 0)
+  {
+    fullFlowAction();
+  }
 
   // checkTimes = 60;
   // while (checkTimes-- > 0)
@@ -924,38 +1252,40 @@ void connectTask(void *pvParameters)
 CyMCP23016 mcpU6;
 CyMCP23016 mcpU7;
 
-void setup() {
-    Serial.begin(115200);
+void setup()
+{
+  Serial.begin(115200);
 
-    mcpU6.begin(17, 18, 0x26);
+  mcpU6.begin(17, 18, 0x26);
 
-    mcpU7.begin(17, 18, 0x27);
+  mcpU7.begin(17, 18, 0x27);
 
-    // Set Pin 0 on Port 0 as an output.
-    mcpU6.pinMode(MCP23016_PIN_GPIO1_5, INPUT_PULLDOWN);
-    mcpU7.pinMode(MCP23016_PIN_GPIO1_0, INPUT_PULLDOWN);
+  // Set Pin 0 on Port 0 as an output.
+  mcpU6.pinMode(MCP23016_PIN_GPIO1_5, INPUT_PULLDOWN);
+  mcpU7.pinMode(MCP23016_PIN_GPIO1_0, INPUT_PULLDOWN);
 }
 
-void loop() {
-    delay(400);
+void loop()
+{
+  delay(400);
 
-    // Set the pin HIGH and read back the state.
-    // mcp.digitalWrite(MCP23016_PIN_GPIO1_0, HIGH);
-    uint8_t val = mcpU6.digitalRead(MCP23016_PIN_GPIO1_5);
-    Serial.print(F("U6 1.5 is "));
-    Serial.println(val == HIGH ? "HIGH" : "LOW");
+  // Set the pin HIGH and read back the state.
+  // mcp.digitalWrite(MCP23016_PIN_GPIO1_0, HIGH);
+  uint8_t val = mcpU6.digitalRead(MCP23016_PIN_GPIO1_5);
+  Serial.print(F("U6 1.5 is "));
+  Serial.println(val == HIGH ? "HIGH" : "LOW");
 
-    val = mcpU7.digitalRead(MCP23016_PIN_GPIO1_0);
-    Serial.print(F("U7 0.2 is "));
-    Serial.println(val == HIGH ? "HIGH" : "LOW");
+  val = mcpU7.digitalRead(MCP23016_PIN_GPIO1_0);
+  Serial.print(F("U7 0.2 is "));
+  Serial.println(val == HIGH ? "HIGH" : "LOW");
 
-    // delay(1000);
+  // delay(1000);
 
-    // // Set the pin LOW and read back the state.
-    // mcp.digitalWrite(MCP23016_PIN_GPIO1_0, LOW);
-    // val = mcp.digitalRead(MCP23016_PIN_GPIO1_0);
-    // Serial.print(F("Pin 0.0 is "));
-    // Serial.println(val == HIGH ? "HIGH" : "LOW");
+  // // Set the pin LOW and read back the state.
+  // mcp.digitalWrite(MCP23016_PIN_GPIO1_0, LOW);
+  // val = mcp.digitalRead(MCP23016_PIN_GPIO1_0);
+  // Serial.print(F("Pin 0.0 is "));
+  // Serial.println(val == HIGH ? "HIGH" : "LOW");
 }
 
 #endif
