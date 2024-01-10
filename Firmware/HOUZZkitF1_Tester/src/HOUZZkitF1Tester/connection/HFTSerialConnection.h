@@ -45,6 +45,8 @@ public:
 
     String sendString(uint16_t pid, const String& data, float timeout); //发送字符串并等待返回
 
+    void sendDebug(const String& data);
+
     String readString(float timeout);
 
     void receivedData(const String &data);

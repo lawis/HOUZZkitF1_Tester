@@ -19,6 +19,54 @@ HFTEncoder *m_hftEncoder = nullptr;
 HFTDevice *m_hftDevice = nullptr;
 ConnectionManager *m_connectionManager = nullptr;
 
+QueueHandle_t g_xQueue = nullptr;
+xSemaphoreHandle g_xMutex = nullptr;
+typedef bool (*xMessageCallback)(const uint8_t *buffer, const uint32_t size);
+typedef struct xMESSAGE
+{
+  xMessageCallback handle;
+  uint8_t *buffer;
+  uint32_t size;
+  xMESSAGE()
+      : handle(nullptr), buffer(nullptr), size(0){
+
+                                          };
+
+  xMESSAGE(xMessageCallback h)
+      : handle(h), buffer(nullptr), size(0){
+
+                                    };
+
+  xMESSAGE(xMessageCallback h, const uint8_t *b, const uint32_t s)
+      : handle(h), buffer(nullptr), size(s)
+  {
+    if (b)
+    {
+      buffer = (uint8_t *)malloc(size);
+      memcpy(buffer, b, size);
+    }
+  };
+
+  void freeBuffer()
+  {
+    if (buffer)
+    {
+      free(buffer);
+      buffer = nullptr;
+    }
+  };
+} xMESSAGE;
+
+#define NET_QUEUE_SEND(msg) xQueueSend(g_xQueue, msg, portMAX_DELAY);
+#define NET_QUEUE_RECEIVE(msg) (pdPASS != xQueueReceive(g_xQueue, msg, 0))
+
+#define NET_MUTEX_LOCK() \
+  do                     \
+  {                      \
+  } while (xSemaphoreTake(g_xMutex, portMAX_DELAY) != pdPASS)
+#define NET_MUTEX_UNLOCK() xSemaphoreGive(g_xMutex)
+
+void checkFlowTask(void *pvParameters);
 void connectTask(void *pvParameters);
 
 void checkFlow_1(uint16_t *errCode)
@@ -50,12 +98,13 @@ void checkFlow_3(uint16_t *errCode)
 {
   m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_CHECK_1);
   bool deviceConnected = false;
-  uint8_t checkTimes = 60;
+  uint8_t checkTimes = 90;
   while (!deviceConnected && checkTimes-- > 0)
   {
+    // Serial.println("checkFlow 4");
     delay(1000);
     deviceConnected = m_connectionManager->deviceConnected();
-    m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FunctionStatus((59 - checkTimes) / 12 + 1));
+    m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FunctionStatus((89 - checkTimes) / 12 + 1));
   }
 
   if (!deviceConnected)
@@ -65,6 +114,11 @@ void checkFlow_3(uint16_t *errCode)
     return;
   }
   m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_PASS);
+  m_screenManager->lcdDisplay->setFirmwareVersion(m_connectionManager->firmwareVersion);
+  m_screenManager->lcdDisplay->setWanMac(m_connectionManager->eno0Mac);
+  m_screenManager->lcdDisplay->setLanMac(m_connectionManager->eno1Mac);
+  m_screenManager->lcdDisplay->setSnCode(m_connectionManager->snCode);
+  // m_screenManager->lcdDisplay->setNsCode(m_connectionManager->)
 }
 
 void checkFlow_4(uint16_t *errCode)
@@ -73,8 +127,8 @@ void checkFlow_4(uint16_t *errCode)
   String res = m_connectionManager->serialConn->sendString(FL_DEVICE_ACTIVATED, "device_activated", 2);
   if (res.length() == 0)
   {
-    *errCode = 10401;
-    m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_FAIL);
+    // *errCode = 10401;'
+    m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_CHECK_3);
     return;
   }
   if (res == "ok")
@@ -82,8 +136,8 @@ void checkFlow_4(uint16_t *errCode)
     m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_PASS);
     return;
   }
-  m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_FAIL);
-  *errCode = 10402;
+  m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_CHECK_3);
+  // *errCode = 10402;
 }
 
 void checkFlow_5(uint16_t *errCode)
@@ -321,6 +375,7 @@ void checkFlow_13(uint16_t *errCode)
 
 void gpioCheck(uint16_t *errCode, const String &gpio, uint8_t uType, uint8_t pin)
 {
+  // Serial.println(gpio);
   String res = m_connectionManager->serialConn->sendString(FL_GPIO, gpio, 2);
   if (res.length() == 0)
   {
@@ -345,6 +400,10 @@ void gpioCheck(uint16_t *errCode, const String &gpio, uint8_t uType, uint8_t pin
     *errCode = 11403;
     return;
   }
+
+  // m_connectionManager->serialConn->sendDebug(gpio + " " + String(dr));
+  // Serial.println(gpio.substring(3));
+  // Serial.println(dr);
   if (gpio.substring(3).toInt() != dr)
   {
     *errCode = 11404;
@@ -357,140 +416,175 @@ void checkFlow_14(uint16_t *errCode)
   m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_1);
 
   gpioCheck(errCode, "3A40", 6, MCP23016_PIN_GPIO1_5);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
   gpioCheck(errCode, "3A41", 6, MCP23016_PIN_GPIO1_5);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
+  m_screenManager->lcdDisplay->setProgress(41);
 
   gpioCheck(errCode, "3A50", 6, MCP23016_PIN_GPIO1_6);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
   gpioCheck(errCode, "3A51", 6, MCP23016_PIN_GPIO1_6);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
+  m_screenManager->lcdDisplay->setProgress(43);
 
   gpioCheck(errCode, "3A10", 6, MCP23016_PIN_GPIO0_7);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
   gpioCheck(errCode, "3A11", 6, MCP23016_PIN_GPIO0_7);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
+  m_screenManager->lcdDisplay->setProgress(45);
 
   m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_2);
 
   gpioCheck(errCode, "2D60", 6, MCP23016_PIN_GPIO0_6);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
   gpioCheck(errCode, "2D61", 6, MCP23016_PIN_GPIO0_6);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
+  m_screenManager->lcdDisplay->setProgress(47);
 
   gpioCheck(errCode, "2D70", 6, MCP23016_PIN_GPIO0_4);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
   gpioCheck(errCode, "2D71", 6, MCP23016_PIN_GPIO0_4);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
+  m_screenManager->lcdDisplay->setProgress(49);
 
   gpioCheck(errCode, "3A20", 6, MCP23016_PIN_GPIO0_5);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
   gpioCheck(errCode, "3A21", 6, MCP23016_PIN_GPIO0_5);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
+  m_screenManager->lcdDisplay->setProgress(51);
 
   m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_3);
 
   gpioCheck(errCode, "3A00", 6, MCP23016_PIN_GPIO0_2);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
   gpioCheck(errCode, "3A01", 6, MCP23016_PIN_GPIO0_2);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
+  m_screenManager->lcdDisplay->setProgress(53);
 
   gpioCheck(errCode, "2D50", 6, MCP23016_PIN_GPIO0_3);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
   gpioCheck(errCode, "2D51", 6, MCP23016_PIN_GPIO0_3);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
+  m_screenManager->lcdDisplay->setProgress(55);
 
   gpioCheck(errCode, "2D40", 6, MCP23016_PIN_GPIO0_1);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
   gpioCheck(errCode, "2D41", 6, MCP23016_PIN_GPIO0_1);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
+  m_screenManager->lcdDisplay->setProgress(57);
 
   m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_4);
 
   gpioCheck(errCode, "2D30", 7, MCP23016_PIN_GPIO1_0);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
   gpioCheck(errCode, "2D31", 7, MCP23016_PIN_GPIO1_0);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
+  m_screenManager->lcdDisplay->setProgress(59);
 
   gpioCheck(errCode, "3C30", 7, MCP23016_PIN_GPIO1_1);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
   gpioCheck(errCode, "3C31", 7, MCP23016_PIN_GPIO1_1);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
+  m_screenManager->lcdDisplay->setProgress(61);
 
   gpioCheck(errCode, "2D20", 7, MCP23016_PIN_GPIO0_6);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
   gpioCheck(errCode, "2D21", 7, MCP23016_PIN_GPIO0_6);
-  if (errCode != 0)
+  if (*errCode != 0)
   {
+    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
 
@@ -499,21 +593,21 @@ void checkFlow_14(uint16_t *errCode)
 
 void checkFlow_15(uint16_t *errCode)
 {
-  // m_screenManager->showDeviceStatus(FL_PWM, FS_CHECK_1);
-  // String res = m_connectionManager->serialConn->sendString(FL_PWM, "pwm", 2);
-  // if (res.length() == 0)
-  // {
-  //   *errCode = 11501;
-  //   m_screenManager->showDeviceStatus(FL_PWM, FS_FAIL);
-  //   return;
-  // }
-  // if (res == "ok")
-  // {
-  //   m_screenManager->showDeviceStatus(FL_PWM, FS_PASS);
-  //   return;
-  // }
+  m_screenManager->showDeviceStatus(FL_PWM, FS_CHECK_1);
+  String res = m_connectionManager->serialConn->sendString(FL_PWM, "pwm", 2);
+  if (res.length() == 0)
+  {
+    *errCode = 11501;
+    m_screenManager->showDeviceStatus(FL_PWM, FS_FAIL);
+    return;
+  }
+  if (res == "ok")
+  {
+    m_screenManager->showDeviceStatus(FL_PWM, FS_PASS);
+    return;
+  }
   m_screenManager->showDeviceStatus(FL_PWM, FS_FAIL);
-  // *errCode = 11502;
+  *errCode = 11502;
 }
 
 void checkFlow_16(uint16_t *errCode)
@@ -557,27 +651,28 @@ void checkFlow_17(uint16_t *errCode)
 void checkFlow_18(uint16_t *errCode)
 {
   m_screenManager->showDeviceStatus(FL_WIFI, FS_CHECK_1);
-  if (!WiFi.softAP("HOUZZKitF1", "88888888"))
-  {
-    *errCode = 11801;
-    return;
-  }
-  String res = m_connectionManager->serialConn->sendString(FL_WIFI, "wifi", 15);
+  // if (!WiFi.softAP("HOUZZKitF1", "88888888"))
+  // {
+  //   *errCode = 11801;
+  //   return;
+  // }
+  // delay(2000);
+  String res = m_connectionManager->serialConn->sendString(FL_WIFI, "wifi", 30);
   if (res.length() == 0)
   {
     *errCode = 11802;
     m_screenManager->showDeviceStatus(FL_WIFI, FS_FAIL);
-    WiFi.softAPdisconnect(true);
+    // WiFi.softAPdisconnect(true);
     return;
   }
-  if (res == "ok")
+  if (res.toInt() > 10)
   {
     m_screenManager->showDeviceStatus(FL_WIFI, FS_PASS);
-    WiFi.softAPdisconnect(true);
+    // WiFi.softAPdisconnect(true);
     return;
   }
   m_screenManager->showDeviceStatus(FL_WIFI, FS_FAIL);
-  WiFi.softAPdisconnect(true);
+  // WiFi.softAPdisconnect(true);
   *errCode = 11803;
 }
 
@@ -622,6 +717,9 @@ void checkFlow_20(uint16_t *errCode)
 void checkFlow_21(uint16_t *errCode)
 {
   m_screenManager->showDeviceStatus(FL_HDMI, FS_CHECK_1);
+  NET_MUTEX_LOCK();
+  m_screenManager->lcdDisplay->setProgressTitle("检测HDMI后按下", true);
+  NET_MUTEX_UNLOCK();
   // TODO: 提示检测员肉眼检测HDMI到屏幕的输出
   uint64_t checkStart = millis();
   while (millis() - checkStart < 15 * 1000)
@@ -630,8 +728,12 @@ void checkFlow_21(uint16_t *errCode)
     if (rd == 0)
     {
       m_screenManager->showDeviceStatus(FL_HDMI, FS_PASS);
+      NET_MUTEX_LOCK();
+      m_screenManager->lcdDisplay->setProgressTitle("检测中.....");
+      NET_MUTEX_UNLOCK();
       return;
     }
+    delay(1);
   }
   m_screenManager->showDeviceStatus(FL_HDMI, FS_FAIL);
   *errCode = 12101;
@@ -713,18 +815,21 @@ void checkFlow_25(uint16_t *errCode)
   *errCode = 12502;
 }
 
-
-
-class MyEspUsbHost : public EspUsbHost {
+class MyEspUsbHost : public EspUsbHost
+{
 public:
   String snCode = "";
   uint8_t snCodeRecived = 0;
 
-  void onKeyboardKey(uint8_t ascii, uint8_t keycode, uint8_t modifier) {
-    if (' ' <= ascii && ascii <= '~') {
+  void onKeyboardKey(uint8_t ascii, uint8_t keycode, uint8_t modifier)
+  {
+    if (' ' <= ascii && ascii <= '~')
+    {
       // Serial.printf("%c", ascii);
-      snCode += ascii;
-    } else if (ascii == '\r') {
+      snCode += (char)ascii;
+    }
+    else if (ascii == '\r')
+    {
       // Serial.println();
       snCodeRecived = 1;
     }
@@ -733,157 +838,226 @@ public:
 
 void activateDevice(uint16_t *errCode)
 {
-  //请求mac1 mac2 的地址
+  // 请求mac1 mac2 的地址
+  NET_MUTEX_LOCK();
+  m_screenManager->lcdDisplay->setProgressTitle("等待扫SN码");
+  m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_CHECK_3);
+  NET_MUTEX_UNLOCK();
+
   MyEspUsbHost usbHost;
   usbHost.begin();
   usbHost.setHIDLocal(HID_LOCAL_Japan_Katakana);
 
-  //提示扫码枪
+  // 提示扫码枪
   uint64_t checkStart = millis();
   while (millis() - checkStart < 30 * 1000)
   {
     usbHost.task();
     if (usbHost.snCodeRecived)
     {
-      //请求激活
-
+      NET_MUTEX_LOCK();
+      m_screenManager->lcdDisplay->setProgress(97);
+      m_screenManager->lcdDisplay->setProgressTitle("扫码成功");
+      m_screenManager->lcdDisplay->setSnCode(usbHost.snCode);
+      m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_CHECK_4);
+      NET_MUTEX_UNLOCK();
+      String checkCode;
+      bool requestRes = m_connectionManager->ethernetConn->activateDevice(m_connectionManager->eno0Mac, m_connectionManager->eno1Mac, usbHost.snCode, m_connectionManager->verify, checkCode);
+      if (requestRes)
+      {
+        m_screenManager->lcdDisplay->setProgress(99);
+        delay(500);
+        String res = m_connectionManager->serialConn->sendString(31, usbHost.snCode + "," + checkCode, 2);
+        if (res.length() == 0)
+        {
+          *errCode = 13103;
+          NET_MUTEX_LOCK();
+          m_screenManager->lcdDisplay->setProgressTitle("激活失败");
+          m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_FAIL);
+          NET_MUTEX_UNLOCK();
+          return;
+        }
+        if (res == "ok")
+        {
+          NET_MUTEX_LOCK();
+          m_screenManager->lcdDisplay->setProgressTitle("激活成功");
+          m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_PASS);
+          NET_MUTEX_UNLOCK();
+          return;
+        }
+      }
+      else
+      {
+        NET_MUTEX_LOCK();
+        m_screenManager->lcdDisplay->setProgressTitle("激活失败");
+        m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_FAIL);
+        NET_MUTEX_UNLOCK();
+        *errCode = 13101;
+      }
       return;
     }
   }
-  *errCode = 12601;
+  NET_MUTEX_LOCK();
+  m_screenManager->lcdDisplay->setProgressTitle("扫码失败");
+  m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_FAIL);
+  *errCode = 13102;
 }
-
 
 uint16_t checkFlowAction()
 {
   uint16_t errCode = 0;
   bool deviceActivated = false;
-  m_connectionManager->reset();
-  checkFlow_1(&errCode);
-  if (errCode != 0)
-  {
-    return errCode;
-  }
+  // m_connectionManager->reset();
+  // checkFlow_1(&errCode);
+  // if (errCode != 0)
+  // {
+  //   return errCode;
+  // }
+  m_screenManager->lcdDisplay->setProgress(3);
   checkFlow_2(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(6);
   checkFlow_3(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(9);
   checkFlow_4(&errCode);
   if (errCode == 0)
   {
-    deviceActivated = true;
+    // deviceActivated = true;
   }
+  m_screenManager->lcdDisplay->setProgress(12);
   checkFlow_5(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(15);
   checkFlow_6(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(18);
   checkFlow_7(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(21);
   checkFlow_8(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(24);
   checkFlow_9(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(27);
   checkFlow_10(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(30);
   checkFlow_11(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(33);
   checkFlow_12(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(36);
   checkFlow_13(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(39);
   checkFlow_14(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(64);
   checkFlow_15(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(67);
   checkFlow_16(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(70);
   checkFlow_17(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(73);
   checkFlow_18(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(76);
   checkFlow_19(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(79);
   checkFlow_20(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(82);
   checkFlow_21(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(85);
   checkFlow_22(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(88);
   checkFlow_23(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(91);
   checkFlow_24(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(94);
   checkFlow_25(&errCode);
   if (errCode != 0)
   {
     return errCode;
   }
+  m_screenManager->lcdDisplay->setProgress(95);
   if (!deviceActivated)
   {
     activateDevice(&errCode);
@@ -895,30 +1069,51 @@ uint16_t checkFlowAction()
   return errCode;
 }
 
-int fullFlowRunning = 0;
-void fullFlowAction()
+bool fullFlowRunning = false;
+bool checker_connect_net = false;
+bool fullFlowAction(const uint8_t *buffer, const uint32_t size)
 {
-  fullFlowRunning = 1;
+  fullFlowRunning = true;
+  m_screenManager->lcdDisplay->setProgressTitle("检测中.....");
   uint16_t errcode = checkFlowAction();
   if (errcode == 0)
   {
-    //提示测试成功
-  }else
-  {
-    //提示测试失败
+    m_screenManager->lcdDisplay->setProgress(100);
+    m_screenManager->lcdDisplay->setProgressTitle("检测成功,按下后取下设备", true);
   }
-  //提示可以开始下一台设备的测试
-  m_hftDevice->relayOff();
-  
-  fullFlowRunning = 0;
+  else
+  {
+    // 提示测试失败
+    m_screenManager->lcdDisplay->showProgressBar(false);
+    m_screenManager->lcdDisplay->setProgressTitle("检测失败,按下后取下设备", true);
+    m_screenManager->lcdDisplay->setErrorCode(errcode);
+  }
+
+  while (1)
+  {
+    uint8_t rd = digitalRead(ENCODER_BUTTON_PIN);
+    if (rd == 0)
+    {
+      m_hftDevice->relayOff();
+      ESP.restart();
+      return true;
+    }
+    delay(1);
+  }
+  // 提示可以开始下一台设备的测试
+  // m_hftDevice->relayOff();
+
+  fullFlowRunning = false;
+  return true;
 }
 
 void encoderButtonClick()
 {
   // Serial.println("encoderButtonClick");
-  if (fullFlowRunning == 0)
+  if (!fullFlowRunning && checker_connect_net)
   {
-    fullFlowAction();
+    xMESSAGE msg(fullFlowAction);
+    NET_QUEUE_SEND(&msg);
   }
 
   // checkTimes = 60;
@@ -935,11 +1130,11 @@ void encoderRotation(RotationType type)
   {
   case RT_LEFT:
     Serial.println("LEFT");
-    m_screenManager->lcdDisplay->left_slide();
+    // m_screenManager->lcdDisplay->left_slide();
     break;
   case RT_RIGHT:
     Serial.println("RIGHT");
-    m_screenManager->lcdDisplay->right_slide();
+    // m_screenManager->lcdDisplay->right_slide();
     break;
   default:
     break;
@@ -979,6 +1174,13 @@ void setup()
   m_screenManager = ScreenManager::getInstance();
   m_screenManager->initScreen();
 
+  // for (size_t i = 0; i < 25; i++)
+  // {
+  //   m_screenManager->ledMatrix->setPixel(i,CRGB::Green);
+  // }
+  // m_screenManager->ledMatrix->show();
+  // return;
+
   // m_screenManager->ledCheck();
 
   m_hftEncoder = new HFTEncoder();
@@ -989,21 +1191,54 @@ void setup()
   m_hftDevice = new HFTDevice();
   m_hftDevice->init();
 
+  WiFi.softAP("HOUZZKitF1", "88888888");
+
+  g_xMutex = xSemaphoreCreateRecursiveMutex();
+  g_xQueue = xQueueCreate(5, sizeof(xMESSAGE));
+
   // //Start network request thread  //Starting the network on a network thread
-  xTaskCreatePinnedToCore(connectTask, "connectTask", 16384, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(connectTask, "connectTask", 8192, NULL, 1, NULL, 0);
 }
 
 void loop()
 {
   // Serial.println("loop");
+  NET_MUTEX_LOCK();
   m_hftEncoder->tick();
   m_screenManager->lcdDisplay->loop();
+  NET_MUTEX_UNLOCK();
   // delay(100);
+}
+
+void checkFlowTask(void *pvParameters)
+{
+
+  while (1)
+  {
+    xMESSAGE msg;
+    if (!NET_QUEUE_RECEIVE(&msg))
+    {
+      msg.handle(msg.buffer, msg.size);
+      msg.freeBuffer();
+    }
+    vTaskDelay(10);
+  }
+  vTaskDelete(NULL);
 }
 
 void connectTask(void *pvParameters)
 {
   m_connectionManager = ConnectionManager::getInstance();
+  m_screenManager->lcdDisplay->setProgressTitle("等待检测工具联网");
+  uint16_t errCode = 0;
+  checkFlow_1(&errCode);
+  m_screenManager->lcdDisplay->setErrorCode(errCode);
+  if (errCode == 0)
+  {
+    checker_connect_net = true;
+    m_screenManager->lcdDisplay->setProgressTitle("按下检测", true);
+  }
+  xTaskCreatePinnedToCore(checkFlowTask, "checkFlowTask", 16384, NULL, 1, NULL, 0);
   while (1)
   {
     // Serial.println("workFlowLoop");
@@ -1178,31 +1413,38 @@ void connectTask(void *pvParameters)
 //     while (true);
 //   }
 // }
-// #include "EspUsbHost.h"
+#include "EspUsbHost.h"
 
-// class MyEspUsbHost : public EspUsbHost {
-//   void onKeyboardKey(uint8_t ascii, uint8_t keycode, uint8_t modifier) {
-//     if (' ' <= ascii && ascii <= '~') {
-//       Serial.printf("%c", ascii);
-//     } else if (ascii == '\r') {
-//       Serial.println();
-//     }
-//   };
-// };
+class MyEspUsbHost : public EspUsbHost
+{
+  void onKeyboardKey(uint8_t ascii, uint8_t keycode, uint8_t modifier)
+  {
+    if (' ' <= ascii && ascii <= '~')
+    {
+      Serial.printf("%c", ascii);
+    }
+    else if (ascii == '\r')
+    {
+      Serial.println();
+    }
+  };
+};
 
-// MyEspUsbHost usbHost;
+MyEspUsbHost usbHost;
 
-// void setup() {
-//   Serial.begin(115200);
-//   delay(500);
+void setup()
+{
+  Serial.begin(115200);
+  delay(500);
 
-//   usbHost.begin();
-//   usbHost.setHIDLocal(HID_LOCAL_Japan_Katakana);
-// }
+  usbHost.begin();
+  usbHost.setHIDLocal(HID_LOCAL_Japan_Katakana);
+}
 
-// void loop() {
-//   usbHost.task();
-// }
+void loop()
+{
+  usbHost.task();
+}
 
 // #include <Wire.h>
 
@@ -1247,45 +1489,46 @@ void connectTask(void *pvParameters)
  * Basic input/output test for MCP23016 expander.
  */
 
-#include "CyMCP23016.h"
+// #include "CyMCP23016.h"
 
-CyMCP23016 mcpU6;
-CyMCP23016 mcpU7;
+// // CyMCP23016 mcpU6;
+// CyMCP23016 mcpU7;
 
-void setup()
-{
-  Serial.begin(115200);
+// void setup()
+// {
+//   Serial.begin(115200);
 
-  mcpU6.begin(17, 18, 0x26);
+//   // mcpU6.begin(17, 18, 0x26);
 
-  mcpU7.begin(17, 18, 0x27);
+//   mcpU7.begin(17, 18, 0x27);
 
-  // Set Pin 0 on Port 0 as an output.
-  mcpU6.pinMode(MCP23016_PIN_GPIO1_5, INPUT_PULLDOWN);
-  mcpU7.pinMode(MCP23016_PIN_GPIO1_0, INPUT_PULLDOWN);
-}
+//   // // Set Pin 0 on Port 0 as an output.
+//   // mcpU6.pinMode(MCP23016_PIN_GPIO1_5, INPUT);
+//   // WiFi.softAP("HOUZZKitF1", "88888888");
+//   mcpU7.pinMode(MCP23016_PIN_GPIO1_2, INPUT);
+// }
 
-void loop()
-{
-  delay(400);
+// void loop()
+// {
+//   delay(400);
+//   uint8_t val;
+//   // Set the pin HIGH and read back the state.
+//   // mcp.digitalWrite(MCP23016_PIN_GPIO1_0, HIGH);
+//   // val = mcpU6.digitalRead(MCP23016_PIN_GPIO1_5);
+//   // Serial.print(F("U6 1.5 is "));
+//   // Serial.println(val == HIGH ? "HIGH" : "LOW");
 
-  // Set the pin HIGH and read back the state.
-  // mcp.digitalWrite(MCP23016_PIN_GPIO1_0, HIGH);
-  uint8_t val = mcpU6.digitalRead(MCP23016_PIN_GPIO1_5);
-  Serial.print(F("U6 1.5 is "));
-  Serial.println(val == HIGH ? "HIGH" : "LOW");
+//   val = mcpU7.digitalRead(MCP23016_PIN_GPIO1_2);
+//   Serial.print(F("U7 1.2 is "));
+//   Serial.println(val == HIGH ? "HIGH" : "LOW");
 
-  val = mcpU7.digitalRead(MCP23016_PIN_GPIO1_0);
-  Serial.print(F("U7 0.2 is "));
-  Serial.println(val == HIGH ? "HIGH" : "LOW");
+//   // delay(1000);
 
-  // delay(1000);
-
-  // // Set the pin LOW and read back the state.
-  // mcp.digitalWrite(MCP23016_PIN_GPIO1_0, LOW);
-  // val = mcp.digitalRead(MCP23016_PIN_GPIO1_0);
-  // Serial.print(F("Pin 0.0 is "));
-  // Serial.println(val == HIGH ? "HIGH" : "LOW");
-}
+//   // // Set the pin LOW and read back the state.
+//   // mcp.digitalWrite(MCP23016_PIN_GPIO1_0, LOW);
+//   // val = mcp.digitalRead(MCP23016_PIN_GPIO1_0);
+//   // Serial.print(F("Pin 0.0 is "));
+//   // Serial.println(val == HIGH ? "HIGH" : "LOW");
+// }
 
 #endif

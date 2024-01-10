@@ -10,19 +10,22 @@
 extern "C" {
 #endif
 
-    #include "lvgl/lvgl.h"
+#include "lvgl/lvgl.h"
 
 #include "ui_helpers.h"
 #include "ui_events.h"
-void tf_Animation( lv_obj_t *TargetObject, int delay);
+void tf_Animation(lv_obj_t * TargetObject, int delay);
 // SCREEN: ui_Screen1
 void ui_Screen1_screen_init(void);
-extern lv_obj_t *ui_Screen1;
-extern lv_obj_t *ui_lb_version;
-extern lv_obj_t *ui____initial_actions0;
+extern lv_obj_t * ui_Screen1;
+extern lv_obj_t * ui_lb_version;
+extern lv_obj_t * ui_Label2;
+extern lv_obj_t * ui_Label3;
+extern lv_obj_t * ui____initial_actions0;
 
 
 
+LV_FONT_DECLARE(ui_font_SYHeiH);
 
 void ui_init(void);
 

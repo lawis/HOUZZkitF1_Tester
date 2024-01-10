@@ -85,6 +85,9 @@ INLINE uint8_t GetNumberDigits(uint32_t n)
 
 String NumberFormat(int32_t n,uint8_t l);
 
+String split(String origin,String symbol,int index);
+
+
 
 
 #endif //__SDT_MACROS_H__

@@ -31,6 +31,8 @@ public:
 
     uint8_t mcpU7Read(uint8_t pin);
 
+
+
 };
 
 #endif //__HFT_DEVICE_H__
@@ -64,9 +66,9 @@ public:
 24 U6_0.3           2D5         93      √
 25 GND
 26 U6_0.1           2D4         92      √
-27 U7_0.1           1A0         32      X
+27 U7_0.0           1A0         32      X
 28 U6_0.0           1A1         33      X
-29 U7_0.0           3B5         109     X
+29 U7_0.1           3B5         109     X
 30 GND
 31 U7_0.2           0C7         23      X
 32 U7_0.3           0C1         17      X
@@ -79,6 +81,7 @@ public:
 39 GND
 40 U7_0.6           2D2         90      √
 
-
+FAN_EN        U7_1.3       0D6
+FAN_PWM       U7_1.2      3B6
 
 */

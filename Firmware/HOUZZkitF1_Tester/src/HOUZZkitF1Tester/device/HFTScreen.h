@@ -126,9 +126,31 @@ public:
 
     void loop();
 
-    void right_slide();
+    void setCheckerVersion(const String& ver);
 
-    void left_slide();
+    void setFirmwareVersion(const String& ver);
+
+    void setWanMac(const String& mac);
+
+    void setLanMac(const String& mac);
+
+    void setSnCode(const String& sn);
+
+    void setErrorCode(uint16_t code);
+
+    void setProgress(uint8_t progress);
+
+    void setProgressTitle(const String& title,bool showArrow = false);
+
+    void showArrow(bool e);
+
+    void showProgressTitle(bool e);
+
+    void showProgressBar(bool e);
+
+    void startCheck();
+
+    void waitCheckerConnectNet();
 };
 
 #endif //__HFT_SCREEN_H__

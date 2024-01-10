@@ -18,10 +18,9 @@ void HFTDevice::init()
     mcpU7.begin(17,18,0x27);
     for (size_t i = 0; i < 16; i++)
     {
-        mcpU6.pinMode(i,INPUT_PULLDOWN);
-        mcpU7.pinMode(i,INPUT_PULLDOWN);
+        mcpU6.pinMode(i,INPUT);
+        mcpU7.pinMode(i,INPUT);
     }
-    
 }
 
 

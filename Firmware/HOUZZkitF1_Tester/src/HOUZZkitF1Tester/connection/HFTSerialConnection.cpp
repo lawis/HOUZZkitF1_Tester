@@ -99,7 +99,7 @@ void SerialConnection::sendString(uint16_t pid, const String &data)
 
 String SerialConnection::sendString(uint16_t pid, const String &data, float timeout)
 {
-    timeout = 100;
+    // timeout = 100;
     _synchronous = true;
     String res;
     this->clear();
@@ -130,6 +130,12 @@ String SerialConnection::sendString(uint16_t pid, const String &data, float time
     }
     _synchronous = false;
     return res;
+}
+
+void SerialConnection::sendDebug(const String& data)
+{
+    this->sendString(100, data);
+    delay(500);
 }
 
 String SerialConnection::readString(float timeout)

@@ -1,4 +1,5 @@
 #include "HFTConnectionManager.h"
+#include "HOUZZkitF1Tester/SDTMaroc.h"
 
 static ConnectionManager *s_connectionManager = nullptr;
 
@@ -83,18 +84,17 @@ void ConnectionManager::dataParse(uint16_t pid, const String &data)
     }
     case 2:
     {
-        if (data == "DeviceReady")
+
+        String res = split(data,",",0);
+        if (res == "ok")
         {
             _device_connected = true;
+            firmwareVersion = split(data,",",1);
+            eno0Mac = split(data,",",2);
+            eno1Mac = split(data,",",3);
+            verify = split(data,",",4);
+            snCode = split(data,",",5);
         }
-        break;
-    }
-    case 4:
-    {
-        // if (data == "DeviceReady")
-        // {
-        //     _device_connected = true;
-        // }
         break;
     }
     default:

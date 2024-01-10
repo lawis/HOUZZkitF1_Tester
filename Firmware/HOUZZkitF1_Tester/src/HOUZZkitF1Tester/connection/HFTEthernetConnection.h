@@ -5,8 +5,8 @@
 #include "HFTConnectionBase.h"
 #include <map>
 
-#define VERIFICATION_SERVER_HOST "http://192.168.13.110"
-// #define VERIFICATION_SERVER_PORT 80
+#define VERIFICATION_SERVER_HOST "cloud.yinbaiyuan.com"
+#define VERIFICATION_SERVER_PORT 5080
 
 class EthernetConnection : public ConnectionBase
 {
@@ -40,6 +40,8 @@ public:
     void loop();
 
     bool serverConnected();
+
+    bool activateDevice(const String& wanMac,const String& lanMac,const String& snCode,const String& verify,String& checkCode);
 
     bool ethernetReady();
 

@@ -1,0 +1,16 @@
+{
+  "codename": "SYHeiH44",
+  "ttf_path": "\\assets\\SourceHanSansCN-Heavy#1.otf",
+  "bin_path": "\\assets\\ui_font_SYHeiH44.bin",
+  "c_path": "\\assets\\ui_font_SYHeiH44.c",
+  "cfg_path": "\\assets\\ui_font_SYHeiH44.fcfg",
+  "size": 44,
+  "bpp": 2,
+  "letters": 5,
+  "ranges": [
+    "0x20-0x7f"
+  ],
+  "symbols": "按下开始检测联网中通过失败等待扫码激活成功后取设备工具",
+  "customparams": "--no-compress --no-prefilter",
+  "uploaded": false
+}

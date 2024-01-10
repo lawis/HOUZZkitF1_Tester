@@ -17,6 +17,11 @@ public:
     EthernetConnection* ethernetConn = nullptr;
     SerialConnection* serialConn = nullptr;
     SerialConnection* serialRS485 = nullptr;
+    String firmwareVersion = "";
+    String eno0Mac = "";
+    String eno1Mac = "";
+    String verify = "";
+    String snCode = "";
     
 protected:
 

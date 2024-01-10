@@ -60,6 +60,9 @@
         "optional": "cpp",
         "set": "cpp",
         "iostream": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "ui_events.h": "c",
+        "lvgl.h": "c",
+        "ui_helpers.h": "c"
     }
 }

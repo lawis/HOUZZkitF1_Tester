@@ -1,4 +1,5 @@
 #include "HFTScreen.h"
+#include "HFTBuildConfig.h"
 
 static ScreenManager *s_screenManager = nullptr;
 
@@ -138,8 +139,6 @@ static lv_color_t *disp_draw_buf;
 static lv_disp_drv_t disp_drv;
 
 int8_t panelPointer = 0;
-lv_obj_t *panelArr[PANEL_COUNT];
-lv_obj_t *rollerArr[PANEL_COUNT];
 
 void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
 {
@@ -178,19 +177,17 @@ void LcdDisplay::initDisplay()
     lv_indev_drv_register(&indev_drv);
     ui_init();
 
-    panelArr[0] = ui_panelNormal;
-    panelArr[1] = ui_panelSetting1;
-    panelArr[2] = ui_panelSetting2;
-    panelArr[3] = ui_panelSetting3;
-    panelArr[4] = ui_panelSetting4;
-    panelArr[5] = ui_panelSetting5;
-
-    rollerArr[0] = nullptr;
-    rollerArr[1] = ui_roller1;
-    rollerArr[2] = ui_roller2;
-    rollerArr[3] = ui_roller3;
-    rollerArr[4] = ui_roller4;
-    rollerArr[5] = ui_roller5;
+    arrowshake_Animation(ui_img_arrow,0);
+    this->setProgress(0);
+    this->showArrow(false);
+    this->showProgressTitle(false);
+    this->showProgressBar(false);
+    this->setCheckerVersion(FIRMWARE_VERSION);
+    this->setFirmwareVersion("____._._");
+    this->setWanMac("__:__:__:__:__:__");
+    this->setLanMac("__:__:__:__:__:__");
+    this->setSnCode("_____________");
+    this->setErrorCode(0);
 }
 
 void LcdDisplay::loop()
@@ -199,83 +196,101 @@ void LcdDisplay::loop()
     vTaskDelay(5);
 }
 
-void lv_panel_slide_right_value(lv_obj_t *obj, int16_t value)
+
+
+void LcdDisplay::setCheckerVersion(const String& ver)
 {
-    lv_obj_t *scrObj = panelArr[panelPointer + 1];
-    lv_obj_t *desObj = panelArr[panelPointer];
-    lv_obj_set_x(scrObj, value);
-    lv_obj_set_x(desObj, value - 240);
-    // Serial.printf("value :%d\n",value);
+    String str = "Checker Ver. " + ver;
+    lv_label_set_text(ui_lb_version,str.c_str());
 }
 
-void LcdDisplay::right_slide()
+void LcdDisplay::setFirmwareVersion(const String& ver)
 {
-    // right_slide_ani();
-    if (panelPointer > 0)
-    {
-        lv_obj_t *scrObj = panelArr[panelPointer];
-        lv_obj_t *desObj = panelArr[panelPointer - 1];
-        if (!scrObj)
-        {
-            Serial.printf("scrObj is Null\n");
-            return;
-        }
-        if (!desObj)
-        {
-            Serial.printf("desObj is Null\n");
-            return;
-        }
+    String str = "FW: " + ver;
+    lv_label_set_text(ui_lb_firmware,str.c_str());
+}
 
-        lv_obj_clear_flag(scrObj, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(desObj, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_x(scrObj, 0);
-        lv_obj_set_x(desObj, -240);
-        lv_anim_t a;
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, panelArr[panelPointer--]);
-        lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_panel_slide_right_value);
-        lv_anim_set_values(&a, 0, 240);
-        lv_anim_set_time(&a, 500);
-        lv_anim_start(&a);
+void LcdDisplay::setWanMac(const String& mac)
+{
+    String str = "WMac: " + mac;
+    lv_label_set_text(ui_lb_wan_mac,str.c_str());
+}
+
+void LcdDisplay::setLanMac(const String& mac)
+{
+    String str = "LMac: " + mac;
+    lv_label_set_text(ui_lb_lan_mac,str.c_str());
+}
+
+void LcdDisplay::setSnCode(const String& sn)
+{
+    String str = "SN: " + sn;
+    lv_label_set_text(ui_lb_sn_code,str.c_str());
+}
+
+void LcdDisplay::setErrorCode(uint16_t code)
+{
+    String str = "Error: " + String(code);
+    lv_label_set_text(ui_lb_error_code,str.c_str());
+}
+
+void LcdDisplay::setProgress(uint8_t progress)
+{
+    this->showProgressBar(true);
+    lv_bar_set_value(ui_pb_progress,progress,LV_ANIM_ON);
+}
+
+void LcdDisplay::setProgressTitle(const String& title,bool showArrow)
+{
+    this->showProgressTitle(true);
+    lv_label_set_text(ui_lb_title,title.c_str());
+    this->showArrow(showArrow);
+    lv_obj_set_width(ui_lb_title, lv_pct(showArrow?75:92));
+}
+
+void LcdDisplay::showArrow(bool e)
+{
+    if (!e)
+    {
+        lv_obj_add_flag(ui_img_arrow,LV_OBJ_FLAG_HIDDEN);
+    }else
+    {
+        lv_obj_clear_flag(ui_img_arrow,LV_OBJ_FLAG_HIDDEN);
     }
 }
 
-void lv_panel_slide_left_value(lv_obj_t *obj, int16_t value)
+void LcdDisplay::showProgressTitle(bool e)
 {
-    lv_obj_t *scrObj = panelArr[panelPointer - 1];
-    lv_obj_t *desObj = panelArr[panelPointer];
-    lv_obj_set_x(scrObj, -value);
-    lv_obj_set_x(desObj, 240 - value);
-    // Serial.printf("value :%d\n",value);
+    if (!e)
+    {
+        lv_obj_add_flag(ui_lb_title,LV_OBJ_FLAG_HIDDEN);
+    }else
+    {
+        lv_obj_clear_flag(ui_lb_title,LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
-void LcdDisplay::left_slide()
+void LcdDisplay::showProgressBar(bool e)
 {
-    if (panelPointer < PANEL_COUNT - 1)
+    if (!e)
     {
-        lv_obj_t *scrObj = panelArr[panelPointer];
-        lv_obj_t *desObj = panelArr[panelPointer + 1];
-        if (!scrObj)
-        {
-            Serial.printf("scrObj is Null\n");
-            return;
-        }
-        if (!desObj)
-        {
-            Serial.printf("desObj is Null\n");
-            return;
-        }
-
-        lv_obj_clear_flag(scrObj, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(desObj, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_x(scrObj, 0);
-        lv_obj_set_x(desObj, 240);
-        lv_anim_t a;
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, panelArr[panelPointer++]);
-        lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_panel_slide_left_value);
-        lv_anim_set_values(&a, 0, 240);
-        lv_anim_set_time(&a, 500);
-        lv_anim_start(&a);
+        lv_obj_add_flag(ui_pb_progress,LV_OBJ_FLAG_HIDDEN);
+    }else
+    {
+        lv_obj_clear_flag(ui_pb_progress,LV_OBJ_FLAG_HIDDEN);
     }
+}
+
+void LcdDisplay::startCheck()
+{
+    this->showArrow(true);
+    this->showProgressTitle(true);
+    this->setProgressTitle("按下检测");
+}
+
+void LcdDisplay::waitCheckerConnectNet()
+{
+    this->showArrow(false);
+    this->showProgressTitle(true);
+    this->setProgressTitle("等待检测设备联网");
 }
