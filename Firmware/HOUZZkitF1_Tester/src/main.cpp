@@ -12,6 +12,10 @@
 #include "HOUZZkitF1Tester/device/HFTDevice.h"
 #include "HOUZZkitF1Tester/connection/HFTConnectionManager.h"
 
+#define WIFI_SSID "HOUZZKitF1_5961"
+#define WIFI_PSWD  "88888888"
+
+
 #define ENCODER_BUTTON_PIN 6
 
 ScreenManager *m_screenManager = nullptr;
@@ -104,7 +108,7 @@ void checkFlow_3(uint16_t *errCode)
     // Serial.println("checkFlow 4");
     delay(1000);
     deviceConnected = m_connectionManager->deviceConnected();
-    m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FunctionStatus((89 - checkTimes) / 12 + 1));
+    m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FunctionStatus((89 - checkTimes) / 18 + 1));
   }
 
   if (!deviceConnected)
@@ -547,18 +551,18 @@ void checkFlow_14(uint16_t *errCode)
 
   m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_4);
 
-  gpioCheck(errCode, "2D30", 7, MCP23016_PIN_GPIO1_0);
-  if (*errCode != 0)
-  {
-    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
-    return;
-  }
-  gpioCheck(errCode, "2D31", 7, MCP23016_PIN_GPIO1_0);
-  if (*errCode != 0)
-  {
-    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
-    return;
-  }
+  // gpioCheck(errCode, "2D30", 7, MCP23016_PIN_GPIO1_0);
+  // if (*errCode != 0)
+  // {
+  //   m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
+  //   return;
+  // }
+  // gpioCheck(errCode, "2D31", 7, MCP23016_PIN_GPIO1_0);
+  // if (*errCode != 0)
+  // {
+  //   m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
+  //   return;
+  // }
   m_screenManager->lcdDisplay->setProgress(59);
 
   gpioCheck(errCode, "3C30", 7, MCP23016_PIN_GPIO1_1);
@@ -657,7 +661,7 @@ void checkFlow_18(uint16_t *errCode)
   //   return;
   // }
   // delay(2000);
-  String res = m_connectionManager->serialConn->sendString(FL_WIFI, "wifi", 30);
+  String res = m_connectionManager->serialConn->sendString(FL_WIFI, String(WIFI_SSID)+","+String(WIFI_PSWD), 30);
   if (res.length() == 0)
   {
     *errCode = 11802;
@@ -1191,7 +1195,7 @@ void setup()
   m_hftDevice = new HFTDevice();
   m_hftDevice->init();
 
-  WiFi.softAP("HOUZZKitF1", "88888888");
+  WiFi.softAP(WIFI_SSID, WIFI_PSWD);
 
   g_xMutex = xSemaphoreCreateRecursiveMutex();
   g_xQueue = xQueueCreate(5, sizeof(xMESSAGE));

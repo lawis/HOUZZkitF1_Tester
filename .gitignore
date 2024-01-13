@@ -12,3 +12,5 @@ Firmware/HOUZZkitF1_Tester/.vscode/launch.json
 Firmware/HOUZZkitF1_Tester/.vscode/ipch
 Firmware/HOUZZkitF1_Tester_GUI/HOUZZkitF1_Tester_GUI/autosave/
 Firmware/HOUZZkitF1_Tester_GUI/HOUZZkitF1_Tester_GUI/backup/
+Firmware/HOUZZkitF1_Tester/tools/Esp32Burn/__pycache__/
+Firmware/HOUZZkitF1_Tester/tools/Esp32Burn/LIBRARY/Lib/__pycache__/

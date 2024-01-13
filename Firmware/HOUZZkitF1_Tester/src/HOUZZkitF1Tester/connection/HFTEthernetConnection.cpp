@@ -3,7 +3,7 @@
 #include <EthernetHTTPClient.h>
 #include <ArduinoJson.h>
 
-byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xFD};
+byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xFF};
 IPAddress defaultIp(192, 168, 13, 177);
 IPAddress defaultDns(114, 114, 114, 114);
 // EthernetClient client;
