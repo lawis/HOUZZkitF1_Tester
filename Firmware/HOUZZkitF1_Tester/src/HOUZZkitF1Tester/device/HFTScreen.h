@@ -51,7 +51,9 @@ enum FunctionList
     FL_IIC_INTERFACE,
     FL_MICROPHONE,
     FL_JACKPOT,
-    FL_MIPI
+    FL_MIPI,
+    FL_SEND_FILE = 127,
+    FL_LOAD_PYFILE = 128
 };
 
 class ScreenManager

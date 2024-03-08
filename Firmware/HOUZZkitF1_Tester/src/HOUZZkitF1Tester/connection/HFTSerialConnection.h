@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include "HFTConnectionBase.h"
-
+#include "SPIFFS.h"
 
 class SerialConnection : public ConnectionBase
 {
@@ -45,11 +45,15 @@ public:
 
     String sendString(uint16_t pid, const String& data, float timeout); //发送字符串并等待返回
 
+    String sendFile(uint16_t pid, File& file,float timeout);
+
     void sendDebug(const String& data);
 
     String readString(float timeout);
 
     void receivedData(const String &data);
+
+    void sendData(uint8_t *data, size_t length);
 
     void loop();
 

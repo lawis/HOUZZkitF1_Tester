@@ -1,5 +1,6 @@
 #include "HFTSerialConnection.h"
 
+
 SerialConnection::SerialConnection(ConnectionBaseDelegate *delegate)
     : ConnectionBase(delegate)
 {
@@ -100,10 +101,49 @@ void SerialConnection::sendString(uint16_t pid, const String &data)
 String SerialConnection::sendString(uint16_t pid, const String &data, float timeout)
 {
     // timeout = 100;
+    // delay(200);
     _synchronous = true;
     String res;
     this->clear();
     this->sendString(pid, data);
+    unsigned long start = millis();
+    while (millis() - start < timeout * 1000)
+    {
+        delay(100);
+        res = this->readString();
+        if (res.length() > 0)
+        {
+            int index = res.indexOf(":");
+            if (index < 1)
+            {
+                // 不合法字符串
+                res = "";
+                continue;
+            }
+            String pidStr = res.substring(0, index);
+            if (pidStr.toInt() != pid)
+            {
+                res = "";
+                continue;
+            }
+            res = res.substring(index + 1);
+            break;
+        }
+    }
+    _synchronous = false;
+    return res;
+}
+
+String SerialConnection::sendFile(uint16_t pid, File& file,float timeout)
+{
+    _synchronous = true;
+    this->clear();
+    String res;
+    while (file.available())
+    {
+      uint8_t ontByte = file.read();
+      this->sendData(&ontByte,1);
+    }
     unsigned long start = millis();
     while (millis() - start < timeout * 1000)
     {
@@ -171,6 +211,26 @@ void SerialConnection::receivedData(const String &data)
     if (_delegate)
     {
         _delegate->dataParse(pid, payload);
+    }
+}
+
+void SerialConnection::sendData(uint8_t *data, size_t length)
+{
+    switch (_serialType)
+    {
+    case ST_HARD:
+    case ST_HARD_INNER:
+    {
+        _hardSerial->write(data,length);
+        break;
+    }
+    case ST_SOFT:
+    {
+        // todo
+        break;
+    }
+    default:
+        break;
     }
 }
 

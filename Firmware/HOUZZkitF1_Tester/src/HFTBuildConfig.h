@@ -1,4 +1,4 @@
-#define FIRMWARE_VERSION        "1.0.1"
+#define FIRMWARE_VERSION        "1.0.3"
 
 //Build version number, increase by 1 automatically each time you compile
 #define FIRMWARE_BUILD_VERSION  38

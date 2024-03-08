@@ -23,7 +23,8 @@ def writeFirmware(serialPort):
         + " 0x00000000 " + CurrentPath + "bootloader.bin " \
         + " 0x00008000 " + CurrentPath + "partitions.bin " \
         + " 0x0000e000 " + CurrentPath + "boot_app0.bin " \
-        + " 0x00010000 "  + CurrentPath + "firmware.bin "
+        + " 0x00010000 " + CurrentPath + "firmware.bin " \
+        + " 0x00310000 " + CurrentPath + "spiffs.bin "
     try:
         res = str(subprocess.check_output(cmd, shell=True))
         printWithColor(serialPort + ' 烧录完成',92)

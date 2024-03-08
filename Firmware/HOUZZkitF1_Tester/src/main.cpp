@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <WiFiAP.h>
 #include "EspUsbHost.h"
+// #include "SPIFFS.h"
 // #define UNIT_TEST
 
 #ifndef UNIT_TEST
@@ -98,6 +99,43 @@ void checkFlow_2(uint16_t *errCode)
   m_screenManager->showDeviceStatus(FL_DEVICE_POWER_ON, FS_PASS);
 }
 
+bool _spiffsInit = false;
+
+void checkFlow_sendFile(const String& filename, uint16_t *errCode,uint8_t err)
+{
+  if (!_spiffsInit)
+  {
+      if(!SPIFFS.begin(true))
+      {
+          *errCode = 20300 + err;
+          return;
+      }
+      _spiffsInit = true;
+  }
+  File file = SPIFFS.open(filename.c_str());
+  if (!file)
+  {
+      *errCode = 30300 + err;
+      return;
+  }
+  size_t fileSize = file.size();
+
+  String res =  m_connectionManager->serialConn->sendString(FL_SEND_FILE,filename.substring(1)+","+String(fileSize),2);
+  if (res != "ready")
+  {
+      file.close();
+      *errCode = 40300 + err;
+      return;
+  }
+  res = m_connectionManager->serialConn->sendFile(FL_SEND_FILE,file,2);
+  if (res != "ok")
+  {
+      file.close();
+      *errCode = 50300 + err;
+      return;
+  }
+}
+
 void checkFlow_3(uint16_t *errCode)
 {
   m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_CHECK_1);
@@ -117,12 +155,42 @@ void checkFlow_3(uint16_t *errCode)
     m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_FAIL);
     return;
   }
-  m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_PASS);
+  // m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_PASS);
   m_screenManager->lcdDisplay->setFirmwareVersion(m_connectionManager->firmwareVersion);
   m_screenManager->lcdDisplay->setWanMac(m_connectionManager->eno0Mac);
   m_screenManager->lcdDisplay->setLanMac(m_connectionManager->eno1Mac);
   m_screenManager->lcdDisplay->setSnCode(m_connectionManager->snCode);
   // m_screenManager->lcdDisplay->setNsCode(m_connectionManager->)
+
+  checkFlow_sendFile("/F1Checker.py",errCode ,1);
+  if (*errCode != 0)
+  {
+    m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_FAIL);
+    return;
+  }
+
+  checkFlow_sendFile("/gpio.py",errCode ,2);
+  if (*errCode != 0)
+  {
+    m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_FAIL);
+    return;
+  }
+
+  String res = m_connectionManager->serialConn->sendString(FL_LOAD_PYFILE, "F1Checker.py", 2);
+  
+  if (res.length() == 0)
+  {
+    *errCode = 10302;
+    m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_FAIL);
+    return;
+  }
+  if (res != "ok")
+  {
+    *errCode = 10303;
+    m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_FAIL);
+    return;
+  }
+  m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_PASS);
 }
 
 void checkFlow_4(uint16_t *errCode)
@@ -131,7 +199,7 @@ void checkFlow_4(uint16_t *errCode)
   String res = m_connectionManager->serialConn->sendString(FL_DEVICE_ACTIVATED, "device_activated", 2);
   if (res.length() == 0)
   {
-    // *errCode = 10401;'
+    // *errCode = 10401;
     m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_CHECK_3);
     return;
   }
@@ -309,13 +377,13 @@ void checkFlow_11(uint16_t *errCode)
   String res = m_connectionManager->serialConn->sendString(FL_RS232, "/dev/ttyS9", 5);
   if (res.length() == 0)
   {
-    *errCode = 11001;
+    *errCode = 11101;
     m_screenManager->showDeviceStatus(FL_RS232, FS_FAIL);
     return;
   }
   if (res != "ok")
   {
-    *errCode = 11002;
+    *errCode = 11102;
     m_screenManager->showDeviceStatus(FL_RS232, FS_FAIL);
     return;
   }
@@ -326,13 +394,13 @@ void checkFlow_11(uint16_t *errCode)
   res = m_connectionManager->serialConn->sendString(FL_RS232, "/dev/ttyS4", 5);
   if (res.length() == 0)
   {
-    *errCode = 11003;
+    *errCode = 11103;
     m_screenManager->showDeviceStatus(FL_RS232, FS_FAIL);
     return;
   }
   if (res != "ok")
   {
-    *errCode = 11004;
+    *errCode = 11104;
     m_screenManager->showDeviceStatus(FL_RS232, FS_FAIL);
     return;
   }
@@ -377,18 +445,19 @@ void checkFlow_13(uint16_t *errCode)
   *errCode = 11302;
 }
 
-void gpioCheck(uint16_t *errCode, const String &gpio, uint8_t uType, uint8_t pin)
+void gpioCheck(uint16_t *errCode, const String &gpio, uint8_t uType, uint8_t pin,uint8_t err)
 {
   // Serial.println(gpio);
-  String res = m_connectionManager->serialConn->sendString(FL_GPIO, gpio, 2);
+  delay(500);
+  String res = m_connectionManager->serialConn->sendString(FL_GPIO, gpio, 5);
   if (res.length() == 0)
   {
-    *errCode = 11401;
+    *errCode = 21400 + err;
     return;
   }
   if (res != "ok")
   {
-    *errCode = 11402;
+    *errCode = 31400 + err;
     return;
   }
   uint8_t dr = 0;
@@ -401,7 +470,7 @@ void gpioCheck(uint16_t *errCode, const String &gpio, uint8_t uType, uint8_t pin
     dr = m_hftDevice->mcpU7Read(pin);
     break;
   default:
-    *errCode = 11403;
+    *errCode = 41400 + err;
     return;
   }
 
@@ -410,7 +479,7 @@ void gpioCheck(uint16_t *errCode, const String &gpio, uint8_t uType, uint8_t pin
   // Serial.println(dr);
   if (gpio.substring(3).toInt() != dr)
   {
-    *errCode = 11404;
+    *errCode = 11400 + err;
     return;
   }
 }
@@ -419,27 +488,29 @@ void checkFlow_14(uint16_t *errCode)
 {
   m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_1);
 
-  gpioCheck(errCode, "3A40", 6, MCP23016_PIN_GPIO1_5);
-  if (*errCode != 0)
-  {
-    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
-    return;
-  }
-  gpioCheck(errCode, "3A41", 6, MCP23016_PIN_GPIO1_5);
-  if (*errCode != 0)
-  {
-    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
-    return;
-  }
+  // gpioCheck(errCode, "3A40", 6, MCP23016_PIN_GPIO1_5,1);
+  // if (*errCode != 0)
+  // {
+  //   m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
+  //   return;
+  // }
+  // gpioCheck(errCode, "3A41", 6, MCP23016_PIN_GPIO1_5,2);
+  // if (*errCode != 0)
+  // {
+  //   m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
+  //   return;
+  // }
   m_screenManager->lcdDisplay->setProgress(41);
 
-  gpioCheck(errCode, "3A50", 6, MCP23016_PIN_GPIO1_6);
+
+
+  gpioCheck(errCode, "3A50", 6, MCP23016_PIN_GPIO1_6,3);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
-  gpioCheck(errCode, "3A51", 6, MCP23016_PIN_GPIO1_6);
+  gpioCheck(errCode, "3A51", 6, MCP23016_PIN_GPIO1_6,4);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
@@ -447,13 +518,13 @@ void checkFlow_14(uint16_t *errCode)
   }
   m_screenManager->lcdDisplay->setProgress(43);
 
-  gpioCheck(errCode, "3A10", 6, MCP23016_PIN_GPIO0_7);
+  gpioCheck(errCode, "3A10", 6, MCP23016_PIN_GPIO0_7,5);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
-  gpioCheck(errCode, "3A11", 6, MCP23016_PIN_GPIO0_7);
+  gpioCheck(errCode, "3A11", 6, MCP23016_PIN_GPIO0_7,6);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
@@ -463,13 +534,13 @@ void checkFlow_14(uint16_t *errCode)
 
   m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_2);
 
-  gpioCheck(errCode, "2D60", 6, MCP23016_PIN_GPIO0_6);
+  gpioCheck(errCode, "2D60", 6, MCP23016_PIN_GPIO0_6,7);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
-  gpioCheck(errCode, "2D61", 6, MCP23016_PIN_GPIO0_6);
+  gpioCheck(errCode, "2D61", 6, MCP23016_PIN_GPIO0_6,8);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
@@ -477,13 +548,13 @@ void checkFlow_14(uint16_t *errCode)
   }
   m_screenManager->lcdDisplay->setProgress(47);
 
-  gpioCheck(errCode, "2D70", 6, MCP23016_PIN_GPIO0_4);
+  gpioCheck(errCode, "2D70", 6, MCP23016_PIN_GPIO0_4,9);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
-  gpioCheck(errCode, "2D71", 6, MCP23016_PIN_GPIO0_4);
+  gpioCheck(errCode, "2D71", 6, MCP23016_PIN_GPIO0_4,10);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
@@ -491,13 +562,13 @@ void checkFlow_14(uint16_t *errCode)
   }
   m_screenManager->lcdDisplay->setProgress(49);
 
-  gpioCheck(errCode, "3A20", 6, MCP23016_PIN_GPIO0_5);
+  gpioCheck(errCode, "3A20", 6, MCP23016_PIN_GPIO0_5,11);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
-  gpioCheck(errCode, "3A21", 6, MCP23016_PIN_GPIO0_5);
+  gpioCheck(errCode, "3A21", 6, MCP23016_PIN_GPIO0_5,12);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
@@ -507,13 +578,13 @@ void checkFlow_14(uint16_t *errCode)
 
   m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_3);
 
-  gpioCheck(errCode, "3A00", 6, MCP23016_PIN_GPIO0_2);
+  gpioCheck(errCode, "3A00", 6, MCP23016_PIN_GPIO0_2,13);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
-  gpioCheck(errCode, "3A01", 6, MCP23016_PIN_GPIO0_2);
+  gpioCheck(errCode, "3A01", 6, MCP23016_PIN_GPIO0_2,14);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
@@ -521,13 +592,13 @@ void checkFlow_14(uint16_t *errCode)
   }
   m_screenManager->lcdDisplay->setProgress(53);
 
-  gpioCheck(errCode, "2D50", 6, MCP23016_PIN_GPIO0_3);
+  gpioCheck(errCode, "2D50", 6, MCP23016_PIN_GPIO0_3,15);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
-  gpioCheck(errCode, "2D51", 6, MCP23016_PIN_GPIO0_3);
+  gpioCheck(errCode, "2D51", 6, MCP23016_PIN_GPIO0_3,16);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
@@ -535,13 +606,13 @@ void checkFlow_14(uint16_t *errCode)
   }
   m_screenManager->lcdDisplay->setProgress(55);
 
-  gpioCheck(errCode, "2D40", 6, MCP23016_PIN_GPIO0_1);
+  gpioCheck(errCode, "2D40", 6, MCP23016_PIN_GPIO0_1,17);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
-  gpioCheck(errCode, "2D41", 6, MCP23016_PIN_GPIO0_1);
+  gpioCheck(errCode, "2D41", 6, MCP23016_PIN_GPIO0_1,18);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
@@ -551,41 +622,42 @@ void checkFlow_14(uint16_t *errCode)
 
   m_screenManager->showDeviceStatus(FL_GPIO, FS_CHECK_4);
 
-  // gpioCheck(errCode, "2D30", 7, MCP23016_PIN_GPIO1_0);
+  // gpioCheck(errCode, "2D30", 7, MCP23016_PIN_GPIO1_0,19);
   // if (*errCode != 0)
   // {
   //   m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
   //   return;
   // }
-  // gpioCheck(errCode, "2D31", 7, MCP23016_PIN_GPIO1_0);
+  // gpioCheck(errCode, "2D31", 7, MCP23016_PIN_GPIO1_0,20);
   // if (*errCode != 0)
   // {
   //   m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
   //   return;
   // }
+  
   m_screenManager->lcdDisplay->setProgress(59);
 
-  gpioCheck(errCode, "3C30", 7, MCP23016_PIN_GPIO1_1);
-  if (*errCode != 0)
-  {
-    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
-    return;
-  }
-  gpioCheck(errCode, "3C31", 7, MCP23016_PIN_GPIO1_1);
-  if (*errCode != 0)
-  {
-    m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
-    return;
-  }
+  // gpioCheck(errCode, "3C30", 7, MCP23016_PIN_GPIO1_1,21);
+  // if (*errCode != 0)
+  // {
+  //   m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
+  //   return;
+  // }
+  // gpioCheck(errCode, "3C31", 7, MCP23016_PIN_GPIO1_1,22);
+  // if (*errCode != 0)
+  // {
+  //   m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
+  //   return;
+  // }
   m_screenManager->lcdDisplay->setProgress(61);
 
-  gpioCheck(errCode, "2D20", 7, MCP23016_PIN_GPIO0_6);
+  gpioCheck(errCode, "2D20", 7, MCP23016_PIN_GPIO0_6,23);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
     return;
   }
-  gpioCheck(errCode, "2D21", 7, MCP23016_PIN_GPIO0_6);
+  gpioCheck(errCode, "2D21", 7, MCP23016_PIN_GPIO0_6,24);
   if (*errCode != 0)
   {
     m_screenManager->showDeviceStatus(FL_GPIO, FS_FAIL);
@@ -598,7 +670,7 @@ void checkFlow_14(uint16_t *errCode)
 void checkFlow_15(uint16_t *errCode)
 {
   m_screenManager->showDeviceStatus(FL_PWM, FS_CHECK_1);
-  String res = m_connectionManager->serialConn->sendString(FL_PWM, "pwm", 2);
+  String res = m_connectionManager->serialConn->sendString(FL_PWM, "pwm", 5);
   if (res.length() == 0)
   {
     *errCode = 11501;
@@ -617,7 +689,7 @@ void checkFlow_15(uint16_t *errCode)
 void checkFlow_16(uint16_t *errCode)
 {
   m_screenManager->showDeviceStatus(FL_WAN, FS_CHECK_1);
-  String res = m_connectionManager->serialConn->sendString(FL_WAN, "wan", 2);
+  String res = m_connectionManager->serialConn->sendString(FL_WAN, "wan", 5);
   if (res.length() == 0)
   {
     *errCode = 11601;
@@ -636,7 +708,7 @@ void checkFlow_16(uint16_t *errCode)
 void checkFlow_17(uint16_t *errCode)
 {
   m_screenManager->showDeviceStatus(FL_LAN, FS_CHECK_1);
-  String res = m_connectionManager->serialConn->sendString(FL_LAN, "lan", 2);
+  String res = m_connectionManager->serialConn->sendString(FL_LAN, "lan", 5);
   if (res.length() == 0)
   {
     *errCode = 11701;
@@ -917,6 +989,11 @@ uint16_t checkFlowAction()
   // {
   //   return errCode;
   // }
+
+  // String res = m_connectionManager->serialConn->sendFile("/F1Checker.py",5);
+  // Serial.println(res);
+  // return 0;
+
   m_screenManager->lcdDisplay->setProgress(3);
   checkFlow_2(&errCode);
   if (errCode != 0)
@@ -977,18 +1054,18 @@ uint16_t checkFlowAction()
   {
     return errCode;
   }
-  m_screenManager->lcdDisplay->setProgress(33);
-  checkFlow_12(&errCode);
-  if (errCode != 0)
-  {
-    return errCode;
-  }
-  m_screenManager->lcdDisplay->setProgress(36);
-  checkFlow_13(&errCode);
-  if (errCode != 0)
-  {
-    return errCode;
-  }
+    // m_screenManager->lcdDisplay->setProgress(33);
+    // checkFlow_12(&errCode);
+    // if (errCode != 0)
+    // {
+    //   return errCode;
+    // }
+  // m_screenManager->lcdDisplay->setProgress(36);
+  // checkFlow_13(&errCode);
+  // if (errCode != 0)
+  // {
+  //   return errCode;
+  // }
   m_screenManager->lcdDisplay->setProgress(39);
   checkFlow_14(&errCode);
   if (errCode != 0)
@@ -1417,38 +1494,38 @@ void connectTask(void *pvParameters)
 //     while (true);
 //   }
 // }
-#include "EspUsbHost.h"
+// #include "EspUsbHost.h"
 
-class MyEspUsbHost : public EspUsbHost
-{
-  void onKeyboardKey(uint8_t ascii, uint8_t keycode, uint8_t modifier)
-  {
-    if (' ' <= ascii && ascii <= '~')
-    {
-      Serial.printf("%c", ascii);
-    }
-    else if (ascii == '\r')
-    {
-      Serial.println();
-    }
-  };
-};
+// class MyEspUsbHost : public EspUsbHost
+// {
+//   void onKeyboardKey(uint8_t ascii, uint8_t keycode, uint8_t modifier)
+//   {
+//     if (' ' <= ascii && ascii <= '~')
+//     {
+//       Serial.printf("%c", ascii);
+//     }
+//     else if (ascii == '\r')
+//     {
+//       Serial.println();
+//     }
+//   };
+// };
 
-MyEspUsbHost usbHost;
+// MyEspUsbHost usbHost;
 
-void setup()
-{
-  Serial.begin(115200);
-  delay(500);
+// void setup()
+// {
+//   Serial.begin(115200);
+//   delay(500);
 
-  usbHost.begin();
-  usbHost.setHIDLocal(HID_LOCAL_Japan_Katakana);
-}
+//   usbHost.begin();
+//   usbHost.setHIDLocal(HID_LOCAL_Japan_Katakana);
+// }
 
-void loop()
-{
-  usbHost.task();
-}
+// void loop()
+// {
+//   usbHost.task();
+// }
 
 // #include <Wire.h>
 
@@ -1534,5 +1611,40 @@ void loop()
 //   // Serial.print(F("Pin 0.0 is "));
 //   // Serial.println(val == HIGH ? "HIGH" : "LOW");
 // }
+
+#include "SPIFFS.h"
+
+void setup() 
+{
+  Serial.begin(115200);
+  if(!SPIFFS.begin(true))
+  {
+    Serial.println("Start SPIFFS Error!");
+    return;
+  }
+
+  File file = SPIFFS.open("/F1Checker.py");
+  if (!file)
+  {
+    Serial.println("Open file Error!");
+    return;
+  }else
+  {
+    Serial.printf("文件大小：%ld  文件内容是：\n",file.size());
+    while (file.available())
+    {
+      Serial.print((char)file.read());
+    }
+  }
+  Serial.println("Open file Success!");
+    //打印SPIFFS文件系统信息
+  Serial.printf("SPIFFS文件系统总大小是： %d （字节）\n", SPIFFS.totalBytes());
+  Serial.printf("SPIFFS文件系统已用大小是： %d （字节）\n", SPIFFS.usedBytes());
+}
+
+void loop()
+{
+
+}
 
 #endif
