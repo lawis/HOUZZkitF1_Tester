@@ -15,6 +15,7 @@
 
 #define WIFI_SSID "HOUZZKitF1_5961"
 #define WIFI_PSWD  "88888888"
+String WIFI_SSID_STRING = "HOUZZKitF1_";
 
 
 #define ENCODER_BUTTON_PIN 6
@@ -162,19 +163,19 @@ void checkFlow_3(uint16_t *errCode)
   m_screenManager->lcdDisplay->setSnCode(m_connectionManager->snCode);
   // m_screenManager->lcdDisplay->setNsCode(m_connectionManager->)
 
-  checkFlow_sendFile("/F1Checker.py",errCode ,1);
-  if (*errCode != 0)
-  {
-    m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_FAIL);
-    return;
-  }
+  // checkFlow_sendFile("/F1Checker.py",errCode ,1);
+  // if (*errCode != 0)
+  // {
+  //   m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_FAIL);
+  //   return;
+  // }
 
-  checkFlow_sendFile("/gpio.py",errCode ,2);
-  if (*errCode != 0)
-  {
-    m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_FAIL);
-    return;
-  }
+  // checkFlow_sendFile("/gpio.py",errCode ,2);
+  // if (*errCode != 0)
+  // {
+  //   m_screenManager->showDeviceStatus(FL_DEVICE_CONNECTED, FS_FAIL);
+  //   return;
+  // }
 
   String res = m_connectionManager->serialConn->sendString(FL_LOAD_PYFILE, "F1Checker.py", 2);
   
@@ -733,7 +734,7 @@ void checkFlow_18(uint16_t *errCode)
   //   return;
   // }
   // delay(2000);
-  String res = m_connectionManager->serialConn->sendString(FL_WIFI, String(WIFI_SSID)+","+String(WIFI_PSWD), 30);
+  String res = m_connectionManager->serialConn->sendString(FL_WIFI, String(WIFI_SSID_STRING)+","+String(WIFI_PSWD), 30);
   if (res.length() == 0)
   {
     *errCode = 11802;
@@ -938,7 +939,7 @@ void activateDevice(uint16_t *errCode)
       m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_CHECK_4);
       NET_MUTEX_UNLOCK();
       String checkCode;
-      bool requestRes = m_connectionManager->ethernetConn->activateDevice(m_connectionManager->eno0Mac, m_connectionManager->eno1Mac, usbHost.snCode, m_connectionManager->verify, checkCode);
+      bool requestRes = m_connectionManager->ethernetConn->activateDevice(m_connectionManager->firmwareVersion,m_connectionManager->eno0Mac, m_connectionManager->eno1Mac, usbHost.snCode, m_connectionManager->verify, checkCode,m_connectionManager->burnStartTimestamp,m_connectionManager->burnEndTimestamp);
       if (requestRes)
       {
         m_screenManager->lcdDisplay->setProgress(99);
@@ -953,7 +954,16 @@ void activateDevice(uint16_t *errCode)
           NET_MUTEX_UNLOCK();
           return;
         }
-        if (res == "ok")
+        else if (res == "fail")
+        {
+          *errCode = 13104;
+          NET_MUTEX_LOCK();
+          m_screenManager->lcdDisplay->setProgressTitle("激活失败");
+          m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_FAIL);
+          NET_MUTEX_UNLOCK();
+          return;
+        }
+        else if (res == "ok")
         {
           NET_MUTEX_LOCK();
           m_screenManager->lcdDisplay->setProgressTitle("激活成功");
@@ -976,6 +986,7 @@ void activateDevice(uint16_t *errCode)
   NET_MUTEX_LOCK();
   m_screenManager->lcdDisplay->setProgressTitle("扫码失败");
   m_screenManager->showDeviceStatus(FL_DEVICE_ACTIVATED, FS_FAIL);
+  NET_MUTEX_UNLOCK();
   *errCode = 13102;
 }
 
@@ -1054,18 +1065,18 @@ uint16_t checkFlowAction()
   {
     return errCode;
   }
-    // m_screenManager->lcdDisplay->setProgress(33);
-    // checkFlow_12(&errCode);
-    // if (errCode != 0)
-    // {
-    //   return errCode;
-    // }
-  // m_screenManager->lcdDisplay->setProgress(36);
-  // checkFlow_13(&errCode);
-  // if (errCode != 0)
-  // {
-  //   return errCode;
-  // }
+  m_screenManager->lcdDisplay->setProgress(33);
+  checkFlow_12(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
+  m_screenManager->lcdDisplay->setProgress(36);
+  checkFlow_13(&errCode);
+  if (errCode != 0)
+  {
+    return errCode;
+  }
   m_screenManager->lcdDisplay->setProgress(39);
   checkFlow_14(&errCode);
   if (errCode != 0)
@@ -1272,7 +1283,15 @@ void setup()
   m_hftDevice = new HFTDevice();
   m_hftDevice->init();
 
-  WiFi.softAP(WIFI_SSID, WIFI_PSWD);
+  uint8_t macAddr[6];
+  WiFi.macAddress(macAddr); 
+  char macStr[18] = { 0 };
+  sprintf(macStr, "%02X%02X%02X%02X%02X%02X", macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
+  WIFI_SSID_STRING += String(macStr);
+
+
+
+  WiFi.softAP(WIFI_SSID_STRING, WIFI_PSWD);
 
   g_xMutex = xSemaphoreCreateRecursiveMutex();
   g_xQueue = xQueueCreate(5, sizeof(xMESSAGE));

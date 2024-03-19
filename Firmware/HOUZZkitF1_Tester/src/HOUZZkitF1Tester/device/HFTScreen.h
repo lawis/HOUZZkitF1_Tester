@@ -1,12 +1,13 @@
 #ifndef __HFT_SCREEN_H__
 #define __HFT_SCREEN_H__
-
+#define FASTLED_INTERNAL
 #include <Arduino.h>
 #include "FastLED.h"
 
 #include <Arduino_GFX_Library.h>
 #include <lvgl.h>
 #include "ui.h"
+
 
 #define LED_PIN             16
 #define PANEL_COUNT         6

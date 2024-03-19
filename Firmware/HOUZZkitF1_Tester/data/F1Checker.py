@@ -13,6 +13,10 @@ import socket
 import fcntl
 import struct
 import json
+import ctypes
+from enum import Enum
+from collections import namedtuple
+
 #import pygatt 
 #sudo apt-get install libbluetooth-dev
 #日志等级
@@ -219,8 +223,36 @@ def handlerPWM(value):
    
 def handlerBluetooth(device_address):
     return
-        
-        
+
+def WriteI2cAndRkVerdon(sn,check_code):        
+    result = subprocess.run(f"./factory_check -S {sn}", shell=True, capture_output=True, text=True)
+    #print(result.stdout.rstrip())
+    if result.stdout.rstrip() != "ok":
+        #print(f"factory_check -S {result.stdout}")
+        return False
+    result = subprocess.run(f"./factory_check -s {sn}", shell=True, capture_output=True, text=True)
+    if result.stdout.rstrip() != "ok":
+       # print(f"factory_check -s {result.stdout}")
+        return False
+    result = subprocess.run(f"./factory_check -V {check_code}", shell=True, capture_output=True, text=True)
+    if result.stdout.rstrip() != "ok":
+       # print(f"factory_check -V {result.stdout}")
+        return False
+    result = subprocess.run(f"./factory_check -v {check_code}", shell=True, capture_output=True, text=True)
+    if result.stdout.rstrip() != "ok":
+       # print(f"factory_check -v {result.stdout}")
+        return False
+    HosDeviceName = "HOUZZkit Force 1"    
+    result = subprocess.run(f"./factory_check -M {HosDeviceName}", shell=True, capture_output=True, text=True)
+    if result.stdout.rstrip() != "ok":
+       # print(f"factory_check -M {result.stdout}")
+        return False
+    result = subprocess.run(f"./factory_check -m {HosDeviceName}", shell=True, capture_output=True, text=True)
+    if result.stdout.rstrip() != "ok":
+       # print(f"factory_check -m {result.stdout}")
+        return False
+    
+    return  True    
 #=========================================================
 def dataParse(pid,data,controlPort):
     log_d("recvMsg:" + pid + ":" + data)
@@ -260,7 +292,7 @@ def dataParse(pid,data,controlPort):
     elif pid == "9":
              #IIC加密芯片
              #1.读取i2c芯片中是否存在数据且数据能够被正常校验
-            p = "F1CkeckTest"
+            p = "F1CheckTest"
             output = subprocess.check_output(['hos_release', '-^',p])
             decoded_output = output.decode('utf-8').strip()
             log_d("hos_release -^ " + p + "output :"+ decoded_output)
@@ -408,7 +440,13 @@ def dataParse(pid,data,controlPort):
         }
         json_str = json.dumps(option)
         print(json_str)
-        sendMsg(controlPort,"31","ok")
+        #todo 添加sn码相关
+        res = WriteI2cAndRkVerdon(option["sn"],option["check_code"])
+        if res:
+            sendMsg(controlPort,"31","ok")
+        else:
+            sendMsg(controlPort,"31","false")
+            
         return   
 def sendMsg(serial,pid,msg):
     serial.write((pid + ":" + msg).encode())
@@ -425,45 +463,142 @@ def recvMsg(serial):
     dataParse(pid,msg)
     return pid
 
-def findControlPort():
-    global zigbee_test
-    port_list = list(list_ports.comports())
-    if len(port_list)>1:
-        zigbee_test = True
-    controlPort = None
-    for port in port_list:
-        ser=serial.Serial(port[0],115200,timeout=0.2)
-        sendMsg(ser,"1","ping")
-        res=ser.readall().decode()
-        if res.find("1:pong") != -1:
-            control_port_name = port.name
-            controlPort = ser
-            break
-        else:
-            ser.close()
-    return controlPort
 
-#controlPort = serial.Serial("/dev/ttyS7",115200,timeout=0.2)
-controlPort = findControlPort()
+##########===============sn写入方法实现======================#################
+VENDOR_CONSTANTS = {
+    'VENDOR_SN_ID': 1,
+    'VENDOR_WIFI_MAC_ID': 2,
+    'VENDOR_LAN_MAC_ID': 3,
+    'VENDOR_BT_MAC_ID': 4,
+    'VENDOR_HDCP_14_HDMI_ID': 5,
+    'VENDOR_HDCP_14_DP_ID': 6,
+    'VENDOR_HDCP_2x_ID': 7,
+    'VENDOR_DRM_KEY_ID': 8,
+    'VENDOR_PLAYREADY_Cert_ID': 9,
+    'VENDOR_ATTENTION_KEY_ID': 10,
+    'VENDOR_PLAYREADY_ROOT_KEY_0_ID': 11,
+    'VENDOR_PLAYREADY_ROOT_KEY_1_ID': 12,
+    'VENDOR_SENSOR_CALIBRATION_ID': 13,
+    'VENDOR_IMEI_ID': 15,
+    'VENDOR_VERIFY_CODE_ID': 27,
+    'VENDOR_MODEL_NAME_ID': 28,
+    'VENDOR_CHECK_ID': 29,
+    'VENDOR_MAX_SIZE':1024,
+    'VENDOR_REQ_TAG':0x56524551,
+}
+
+DBT_Sn = 0
+DBT_ModelName = 1
+DBT_Verify = 2
+DBT_Check = 3
+DBT_ERASE = 4
+DBT_Size = 5
+
+I2C_SLAVE = 0x0703
+
+device_info_block_list = {
+    DBT_Sn :{
+        "type":DBT_Sn,
+        "vendor_id" : VENDOR_CONSTANTS['VENDOR_SN_ID'],
+        "offset":8,
+        "size":16,
+    },
+    DBT_ModelName:{
+        "type":DBT_ModelName,
+        "vendor_id" : VENDOR_CONSTANTS['VENDOR_MODEL_NAME_ID'],
+        "offset":24,
+        "size":32,
+    },
+    DBT_Check:{
+        "type":DBT_Check,
+        "vendor_id" : VENDOR_CONSTANTS['VENDOR_VERIFY_CODE_ID'],
+        "offset":56,
+        "size":64,
+    },
+    DBT_ERASE:{
+        "type":DBT_ERASE,
+        "vendor_id" : 255,
+        "offset":0,
+        "size":255,
+    },
+}
+class RKVendorReq(ctypes.Structure):
+    _fields_ = [
+        ('tag', ctypes.c_int),
+        ('id', ctypes.c_int),
+        ('len', ctypes.c_int),
+        ('data', ctypes.c_char * 256)  # 这里假设 data 的最大长度为 256
+    ]
+
+VENDOR_WRITE_IO = 0x564802
+
+def rk_vendor_write(dbt, data, size):
+    if dbt >= DBT_Size or size > device_info_block_list[dbt]["size"]:
+        return -1
+    if size > VENDOR_CONSTANTS['VENDOR_MAX_SIZE']:
+        print("vendor storage input data overflow")
+        return -2
+
+    sys_fd = os.open("/dev/vendor_storage", os.O_RDWR, 0)
+    if sys_fd < 0:
+        print("vendor storage open fail")
+        return -3
+    
+    req = RKVendorReq(VENDOR_CONSTANTS['VENDOR_REQ_TAG'], device_info_block_list[dbt]["vendor_id"], len(data.encode('utf-8')), data.encode('utf-8'))
+    ret = fcntl.ioctl(sys_fd, VENDOR_WRITE_IO, req.serialize(),1)
+    os.close(sys_fd)
+    if ret:
+        print("vendor write error")
+        return -4
+
+    return 0
+
+
+def i2c_write(dbt, data, size):
+    if dbt >= DBT_Size or size > device_info_block_list[dbt]["size"]:
+        return -1
+    i2c_fd = os.open("/dev/i2c-5", os.O_RDWR, 0)
+    if i2c_fd < 0:
+        return -2
+    device_address = 0x50  # Adjust to the desired I2C address
+    ret = fcntl.ioctl(i2c_fd, I2C_SLAVE, device_address)
+    os.close(i2c_fd)
+    if ret:
+        return -3
+    time.sleep(0.004)
+    i2c_fd = open("/dev/i2c-5","r+b")
+    size_offset_buff = bytearray([0, 0])
+    size_offset_buff[0] = device_info_block_list[dbt]["type"]
+    size_offset_buff[1] = size
+    i2c_fd.write(size_offset_buff)
+    time.sleep(0.004)
+    
+    write_point = 0
+    while write_point < size:
+        write_size = min(size - write_point, 8)
+        write_buff = bytearray([0] * (write_size + 1))
+        write_buff[0] = device_info_block_list[dbt]["offset"] + write_point
+        write_buff[1:write_size+1] = data[write_point:write_point+write_size].encode()
+        i2c_fd.write(write_buff)
+        bytes_written = i2c_fd.write(write_buff)
+        if bytes_written != len(write_buff):
+            i2c_fd.close()
+            return -5
+        write_point += write_size
+        time.sleep(0.004)  # Sleep for 4ms
+    
+    i2c_fd.close()
+    return 0
+
 def main():
-    if controlPort == None:
-        log_e("Can not find control port")
-        return
-    command = 'hos_release -v'
-    output = subprocess.check_output(command, shell=True).decode('utf-8')
-    eno0 = get_mac_address("eno0")
-    eno1 = get_mac_address("eno1")
-    verify = read_string_from_file("/var/cache/factory_verify")
-    sn_out_put = subprocess.check_output('hos_release -s', shell=True).decode('utf-8')#sn 码
-    sn = sn_out_put.strip()
-    if len(sn) != 13:
-        sn = "0000000000000"
-    send_msg = "ok"+","+output.strip()+","+eno0+","+eno1+","+verify+","+sn
-    sendMsg(controlPort,"2",send_msg)
-    while True:
-       res = recvMsg(controlPort)
-       if res == "31":
-           break
-
+    # 访问脚本名称
+    script_name = sys.argv[0]
+    # print(f"脚本名称:{script_name}")
+    # 替换文件内容中的占位符
+    sn = sys.argv[1]
+    check_code = sys.argv[2]
+    re = WriteI2cAndRkVerdon(sn,check_code)
+    print(re)
+    
 if __name__=="__main__":
-    main() 
+    main()

@@ -22,6 +22,8 @@ public:
     String eno1Mac = "";
     String verify = "";
     String snCode = "";
+    String burnStartTimestamp = "";
+    String burnEndTimestamp = "";
     
 protected:
 

@@ -41,7 +41,7 @@ public:
 
     bool serverConnected();
 
-    bool activateDevice(const String& wanMac,const String& lanMac,const String& snCode,const String& verify,String& checkCode);
+    bool activateDevice(const String& firmwareVersion, const String& wanMac,const String& lanMac,const String& snCode,const String& verify,String& checkCode,const String& burnStartTimestamp,const String& burnEndTimestamp);
 
     bool ethernetReady();
 

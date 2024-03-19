@@ -250,6 +250,12 @@ void SerialConnection::loop()
             char data = _hardSerial->read();
             res += data;
         }
+        delay(100);
+        while (_hardSerial->available())
+        {
+            char data = _hardSerial->read();
+            res += data;
+        }
         break;
     case ST_SOFT:
         // todo

@@ -66,25 +66,29 @@ bool EthernetConnection::serverConnected()
   return true;
 }
 
-bool EthernetConnection::activateDevice(const String &wanMac, const String &lanMac, const String &snCode, const String &verify,String& checkCode)
+bool EthernetConnection::activateDevice(const String& firmwareVersion, const String &wanMac, const String &lanMac, const String &snCode, const String &verify,String& checkCode,const String& burnStartTimestamp,const String& burnEndTimestamp)
 {
+  // Serial.println("100:"+verify);
+  // Serial.println("100:"+wanMac);
+  // Serial.println("100:"+lanMac);
+  // Serial.println("100:"+snCode);
+  // Serial.println("100:"+burnInTest);
   int responseCode = -1;
   std::map<String, String> payloadMap;
   std::map<String, String> headerMap;
+  payloadMap["version"] = firmwareVersion;
   payloadMap["token"] = verify;
   payloadMap["wan"] = wanMac;
   payloadMap["lan"] = lanMac;
   payloadMap["sn"] = snCode;
+  payloadMap["burnStartTimestamp"] = burnStartTimestamp;
+  payloadMap["burnEndTimestamp"] = burnEndTimestamp;
   String result = this->httpRequest(String("http://") + VERIFICATION_SERVER_HOST + String("/api/json/sys/v2/CheckSn"), &responseCode, payloadMap, headerMap);
 
   uint32_t size = result.length();
   DynamicJsonDocument json(size + 256);
   DeserializationError error = deserializeJson(json, result);
-  // Serial.println("100:"+verify);
-  // Serial.println("100:"+wanMac);
-  // Serial.println("100:"+lanMac);
-  // Serial.println("100:"+snCode);
-  // Serial.println("100:"+result);
+
 
   if (error)
   {
@@ -106,7 +110,7 @@ bool EthernetConnection::ethernetReady()
 
 String EthernetConnection::payloadCreator(const std::map<String, String> &payloadMap)
 {
-  StaticJsonDocument<200> doc;
+  StaticJsonDocument<500> doc;
   for (auto iter = payloadMap.begin(); iter != payloadMap.end(); ++iter)
   {
     doc[iter->first] = iter->second;

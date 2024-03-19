@@ -74,26 +74,45 @@ void ConnectionManager::dataParse(uint16_t pid, const String &data)
 
     switch (pid)
     {
-    case 1:
+    case 101:
     {
         if (data == "ping")
         {
-            serialConn->sendString(1, "pong");
+            serialConn->sendString(101, "pong");
         }
         break;
     }
-    case 2:
+    case 102:
     {
-
         String res = split(data,",",0);
         if (res == "ok")
         {
-            _device_connected = true;
+            // _device_connected = true;
             firmwareVersion = split(data,",",1);
             eno0Mac = split(data,",",2);
             eno1Mac = split(data,",",3);
             verify = split(data,",",4);
-            snCode = split(data,",",5);
+        }
+        break;
+    }
+    case 103:
+    {
+        String res = split(data,",",0);
+        if (res == "ok")
+        {
+            
+            snCode = split(data,",",1);
+            burnStartTimestamp = split(data,",",2);
+            burnEndTimestamp = split(data,",",3);
+            _device_connected = true;
+
+            // Serial.println("200:verify "+verify);
+            // Serial.println("200:wmac "+eno0Mac);
+            // Serial.println("200:lmac "+eno1Mac);
+            // Serial.println("200:sn "+snCode);
+            // Serial.println("200:burn "+burnStartTimestamp);
+            // Serial.println("200:burn "+burnEndTimestamp);
+
         }
         break;
     }
